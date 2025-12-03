@@ -1,0 +1,89 @@
+name: WordPress SQE CI/CD
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js # For WP build/Cypress
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run build:dev # Build WP assets if script exists (add if needed)
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    services:
+      mysql: # For DB tests
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ''
+          MYSQL_DATABASE: wordpress_sqe
+        ports: ["3306:3306"]
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP for PHPUnit (Unit/White-box)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - run: composer install --dev # Install PHPUnit
+      - run: php tests/phpunit/bin/install-wp-tests.sh wordpress_sqe root '' localhost latest # WP test setup
+      - run: vendor/bin/phpunit tests/unit --verbose --coverage-html coverage-unit # Run PHP unit tests
+      - name: Set up Python for Pytest (API/DB/Backend)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pytest requests mysql-connector-python base64
+      - run: pytest tests/backend -v --cov-report=html:coverage-backend # Run API/DB Pytest
+      - name: Set up Cypress for UI/Frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --save-dev cypress
+      - run: npx cypress run # Run UI tests
+      - name: Upload Coverage Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage
+          path: |
+            coverage-*
+            htmlcov
+  staging:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Staging (Vercel)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel --token $VERCEL_TOKEN --scope your-vercel-team --project $VERCEL_PROJECT_ID --prod=false # Staging preview
+  deploy:
+    needs: staging
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Production (AWS example)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: us-east-1
+        run: |
+          zip -r wp.zip .
+          aws s3 cp wp.zip s3://your-s3-bucket/wp.zip
+          aws deploy create-deployment --application-name SQE-WP --deployment-group-name Prod --s3-location bucket=your-s3-bucket,key=wp.zip,bundleType=zip
+      - name: Add Monitoring (Sentry)
+        run: |
+          echo "Post-deploy: Install Sentry plugin in WP admin; configure with DSN ${{ secrets.SENTRY_DSN }}"
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Pipeline complete - check staging/prod URLs and Sentry for issues"
