@@ -129,7 +129,7 @@ jobs:
             sleep 2
           done
 
-      - name: Run Backend/API/DB Tests
+      - name: Run Database Tests (Adil-tests)
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
@@ -137,19 +137,41 @@ jobs:
           DB_PASSWORD: root
           DB_NAME: wordpress_test
         run: |
-          if [ -d "tests/backend" ]; then
-            pytest tests/backend -v --cov --cov-report=html:coverage-backend --cov-report=term || true
+          if [ -d "Adil-tests" ] && [ -f "Adil-tests/test_db_queries.py" ]; then
+            pytest Adil-tests/test_db_queries.py -v --cov --cov-report=html:coverage-db --cov-report=term || true
           else
-            echo "⚠ No backend tests found - skipping"
-            mkdir -p coverage-backend
+            echo "⚠ No database tests found in Adil-tests/ - skipping"
+            mkdir -p coverage-db
           fi
 
-      - name: Upload Backend Coverage
+      - name: Run API Tests (api-tests)
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: wordpress_test
+        run: |
+          if [ -d "api-tests" ] && [ -f "api-tests/test_wp_api.py" ]; then
+            pytest api-tests/test_wp_api.py -v --cov --cov-report=html:coverage-api --cov-report=term || true
+          else
+            echo "⚠ No API tests found in api-tests/ - skipping"
+            mkdir -p coverage-api
+          fi
+
+      - name: Upload Database Coverage
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: backend-coverage
-          path: coverage-backend/
+          name: db-coverage
+          path: coverage-db/
+
+      - name: Upload API Coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-coverage
+          path: coverage-api/
 
   ui-tests:
     needs: build
@@ -179,7 +201,7 @@ jobs:
             e2e: {
               baseUrl: 'http://localhost:8080',
               supportFile: false,
-              specPattern: 'tests/ui/**/*.cy.js'
+              specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}'
             }
           })
           EOF
@@ -194,10 +216,10 @@ jobs:
 
       - name: Run Cypress UI Tests
         run: |
-          if [ -d "tests/ui" ] || [ -d "cypress/e2e" ]; then
+          if [ -d "cypress/e2e" ]; then
             npx cypress run --headless || true
           else
-            echo "⚠ No UI tests found - skipping"
+            echo "⚠ No Cypress UI tests found in cypress/e2e/ - skipping"
           fi
 
       - name: Upload Cypress Screenshots
@@ -229,7 +251,8 @@ jobs:
           echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| PHP Unit Tests | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend/API Tests | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database Tests (Adil-tests) | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+          echo "| API Tests (api-tests) | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
           echo "| UI Tests (Cypress) | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📊 Coverage reports available in artifacts" >> $GITHUB_STEP_SUMMARY
