@@ -22,27 +22,27 @@ jobs:
 
       - name: Validate WordPress Structure
         run: |
-          echo "🔍 Validating project structure..."
+          echo " Validating project structure..."
           if [ -d "wp-admin" ] && [ -d "wp-content" ] && [ -d "wp-includes" ]; then
-            echo "✅ WordPress core files detected"
+            echo " WordPress core files detected"
           fi
           if [ -f "src/WP_Backend_Helper.php" ]; then
-            echo "✅ Helper file found: src/WP_Backend_Helper.php"
+            echo " Helper file found: src/WP_Backend_Helper.php"
           fi
           if [ -d "tests" ]; then
-            echo "✅ PHPUnit tests folder found"
+            echo " PHPUnit tests folder found"
             ls -la tests/ || true
           fi
           if [ -d "Adil-tests" ]; then
-            echo "✅ Database tests folder found"
+            echo " Database tests folder found"
             ls -la Adil-tests/ || true
           fi
           if [ -d "api-tests" ]; then
-            echo "✅ API tests folder found"
+            echo " API tests folder found"
             ls -la api-tests/ || true
           fi
           if [ -d "cypress/e2e" ]; then
-            echo "✅ Cypress UI tests folder found"
+            echo " Cypress UI tests folder found"
             ls -la cypress/e2e/ || true
           fi
 
@@ -51,7 +51,7 @@ jobs:
           if [ -f "composer.json" ]; then
             composer install --no-interaction --prefer-dist --no-progress
           else
-            echo "⚠ No composer.json found - creating one for PHPUnit"
+            echo " No composer.json found - creating one for PHPUnit"
             echo '{
               "require-dev": {
                 "phpunit/phpunit": "^10.0"
@@ -73,12 +73,12 @@ jobs:
       - name: Create package.json and Install Cypress
         run: |
           if [ ! -f "package.json" ]; then
-            echo "📦 Creating package.json..."
+            echo " Creating package.json..."
             npm init -y
             npm pkg set name="wordpress-sqe-tests"
             npm pkg set description="WordPress SQE CI/CD Testing Suite"
           fi
-          echo "📦 Installing Cypress..."
+          echo " Installing Cypress..."
           npm install --save-dev cypress
 
       - name: Cache Dependencies
@@ -94,10 +94,10 @@ jobs:
 
       - name: Build Summary
         run: |
-          echo "✅ Build stage completed successfully"
-          echo "📦 PHP dependencies: Ready"
-          echo "📦 Node.js dependencies: Ready"
-          echo "📦 Cypress: Installed"
+          echo " Build stage completed successfully"
+          echo " PHP dependencies: Ready"
+          echo " Node.js dependencies: Ready"
+          echo " Cypress: Installed"
 
   unit-tests:
     needs: build
@@ -116,7 +116,7 @@ jobs:
       - name: Verify Composer Configuration
         run: |
           if [ ! -f "composer.json" ]; then
-            echo "📝 Creating composer.json for PHPUnit..."
+            echo " Creating composer.json for PHPUnit..."
             cat > composer.json << 'EOF'
           {
             "require-dev": {
@@ -137,7 +137,7 @@ jobs:
       - name: Create PHPUnit Configuration
         run: |
           if [ ! -f "phpunit.xml" ]; then
-            echo "📝 Creating phpunit.xml..."
+            echo "Creating phpunit.xml..."
             cat > phpunit.xml << 'EOF'
           <?xml version="1.0"?>
           <phpunit bootstrap="vendor/autoload.php" colors="true">
@@ -158,21 +158,21 @@ jobs:
       - name: Verify Test Files Exist
         run: |
           if [ -d "tests" ]; then
-            echo "✅ Tests directory found"
+            echo " Tests directory found"
             ls -la tests/
           else
-            echo "❌ No tests/ directory found"
+            echo " No tests/ directory found"
             exit 1
           fi
           if [ -f "src/WP_Backend_Helper.php" ]; then
-            echo "✅ Helper file found: src/WP_Backend_Helper.php"
+            echo " Helper file found: src/WP_Backend_Helper.php"
           else
-            echo "⚠ Helper file not found: src/WP_Backend_Helper.php"
+            echo " Helper file not found: src/WP_Backend_Helper.php"
           fi
 
       - name: Run PHPUnit Tests
         run: |
-          echo "🧪 Running PHPUnit tests..."
+          echo " Running PHPUnit tests..."
           vendor/bin/phpunit --configuration phpunit.xml --verbose --coverage-html coverage-unit || true
 
       - name: Upload Unit Test Coverage
@@ -217,10 +217,10 @@ jobs:
 
       - name: Wait for MySQL to be Ready
         run: |
-          echo "⏳ Waiting for MySQL to be ready..."
+          echo " Waiting for MySQL to be ready..."
           for i in {1..30}; do
             if mysqladmin ping -h"127.0.0.1" -P3306 -uroot -proot --silent; then
-              echo "✅ MySQL is ready!"
+              echo " MySQL is ready!"
               break
             fi
             echo "Waiting... ($i/30)"
@@ -240,7 +240,7 @@ jobs:
           DB_PASSWORD: root
           DB_NAME: wordpress_test
         run: |
-          echo "🧪 Running database tests..."
+          echo " Running database tests..."
           pytest Adil-tests -v --cov --cov-report=html:coverage-db --cov-report=term --cov-fail-under=0 || true
 
       - name: Run API Tests (api-tests)
@@ -251,7 +251,7 @@ jobs:
           DB_PASSWORD: root
           DB_NAME: wordpress_test
         run: |
-          echo "🧪 Running API tests..."
+          echo "Running API tests..."
           pytest api-tests -v --cov --cov-report=html:coverage-api --cov-report=term --cov-fail-under=0 || true
 
       - name: Upload Database Test Coverage
@@ -300,7 +300,7 @@ jobs:
       - name: Create Cypress Configuration
         run: |
           if [ ! -f "cypress.config.js" ]; then
-            echo "📝 Creating cypress.config.js..."
+            echo "Creating cypress.config.js..."
             cat > cypress.config.js << 'EOF'
           const { defineConfig } = require('cypress')
           
@@ -320,14 +320,14 @@ jobs:
 
       - name: Start WordPress Development Server
         run: |
-          echo "🚀 Starting PHP built-in server for WordPress..."
+          echo "Starting PHP built-in server for WordPress..."
           php -S localhost:8080 -t . > server.log 2>&1 &
           sleep 5
-          echo "✅ WordPress dev server running on http://localhost:8080"
+          echo " WordPress dev server running on http://localhost:8080"
 
       - name: Verify Server is Running
         run: |
-          curl -I http://localhost:8080 || echo "⚠ Server might not be responding"
+          curl -I http://localhost:8080 || echo " Server might not be responding"
 
       - run: npx cypress run --headless --browser chrome || true
 
@@ -359,25 +359,25 @@ jobs:
 
       - name: Generate Test Summary Report
         run: |
-          echo "# 🧪 WordPress SQE Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "#  WordPress SQE Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Test Execution Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Test Category | Status | Location |" >> $GITHUB_STEP_SUMMARY
           echo "|--------------|--------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **PHPUnit Unit Tests** | ✅ Completed | \`tests/\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Database Tests** | ✅ Completed | \`Adil-tests/\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **API Tests** | ✅ Completed | \`api-tests/\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Cypress UI Tests** | ✅ Completed | \`cypress/e2e/\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **PHPUnit Unit Tests** |  Completed | \`tests/\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Database Tests** |  Completed | \`Adil-tests/\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **API Tests** |  Completed | \`api-tests/\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Cypress UI Tests** |  Completed | \`cypress/e2e/\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📊 Coverage Reports" >> $GITHUB_STEP_SUMMARY
+          echo "##  Coverage Reports" >> $GITHUB_STEP_SUMMARY
           echo "- PHP Unit Coverage: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Database Test Coverage: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- API Test Coverage: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Cypress Videos/Screenshots: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All test suites executed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo " All test suites executed successfully!" >> $GITHUB_STEP_SUMMARY
 
   staging-deploy:
     needs: test-report
@@ -391,7 +391,7 @@ jobs:
         run: |
           echo "🚀 Deploying to Staging Environment..."
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📦 Creating deployment package..."
+          echo " Creating deployment package..."
           zip -r wordpress-staging.zip . \
             -x "*.git*" \
             -x "node_modules/*" \
@@ -399,18 +399,18 @@ jobs:
             -x "coverage-*/*" \
             -x "cypress/videos/*" \
             -x "cypress/screenshots/*" || true
-          echo "✅ Staging package created: wordpress-staging.zip"
+          echo " Staging package created: wordpress-staging.zip"
           echo "📍 Staging URL: https://staging-wordpress-sqe.example.com"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Run Staging Smoke Tests
         run: |
           echo "🔍 Running staging smoke tests..."
-          echo "✓ Health check: PASSED"
-          echo "✓ Database connectivity: PASSED"
-          echo "✓ WordPress core: PASSED"
-          echo "✓ API endpoints: PASSED"
-          echo "✅ Staging environment verified!"
+          echo " Health check: PASSED"
+          echo " Database connectivity: PASSED"
+          echo " WordPress core: PASSED"
+          echo " API endpoints: PASSED"
+          echo " Staging environment verified!"
 
   production-deploy:
     needs: staging-deploy
@@ -422,9 +422,9 @@ jobs:
 
       - name: Deploy to Production Environment
         run: |
-          echo "🚀 Deploying to Production Environment..."
+          echo " Deploying to Production Environment..."
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📦 Creating production package..."
+          echo " Creating production package..."
           zip -r wordpress-production.zip . \
             -x "*.git*" \
             -x "node_modules/*" \
@@ -434,27 +434,27 @@ jobs:
             -x "api-tests/*" \
             -x "cypress/*" \
             -x "coverage-*/*" || true
-          echo "✅ Production package created: wordpress-production.zip"
-          echo "📍 Production URL: https://wordpress-sqe.example.com"
+          echo " Production package created: wordpress-production.zip"
+          echo " Production URL: https://wordpress-sqe.example.com"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Setup Production Monitoring
         run: |
-          echo "📊 Setting up production monitoring..."
-          echo "✓ Error tracking: CONFIGURED"
-          echo "✓ Performance monitoring: ENABLED"
-          echo "✓ Uptime monitoring: ACTIVE"
-          echo "✓ Log aggregation: READY"
-          echo "✅ Monitoring tools configured!"
+          echo " Setting up production monitoring..."
+          echo " Error tracking: CONFIGURED"
+          echo " Performance monitoring: ENABLED"
+          echo " Uptime monitoring: ACTIVE"
+          echo " Log aggregation: READY"
+          echo " Monitoring tools configured!"
 
       - name: Production Health Check
         run: |
-          echo "🏥 Running production health checks..."
-          echo "✓ Application status: HEALTHY"
-          echo "✓ Database status: HEALTHY"
-          echo "✓ Cache status: HEALTHY"
-          echo "✓ CDN status: HEALTHY"
-          echo "✅ Production deployment successful!"
+          echo " Running production health checks..."
+          echo " Application status: HEALTHY"
+          echo " Database status: HEALTHY"
+          echo " Cache status: HEALTHY"
+          echo " CDN status: HEALTHY"
+          echo " Production deployment successful!"
 
   notify:
     needs: [production-deploy]
@@ -464,19 +464,19 @@ jobs:
       - name: Pipeline Completion Notification
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📢 CI/CD Pipeline Execution Complete"
+          echo " CI/CD Pipeline Execution Complete"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
-          echo "✅ Build Stage: SUCCESS"
-          echo "✅ Unit Tests (PHPUnit): SUCCESS"
-          echo "✅ Backend Tests (Pytest): SUCCESS"
-          echo "✅ UI Tests (Cypress): SUCCESS"
-          echo "✅ Test Reports: GENERATED"
-          echo "✅ Staging Deployment: SUCCESS"
-          echo "✅ Production Deployment: SUCCESS"
+          echo " Build Stage: SUCCESS"
+          echo " Unit Tests (PHPUnit): SUCCESS"
+          echo " Backend Tests (Pytest): SUCCESS"
+          echo " UI Tests (Cypress): SUCCESS"
+          echo " Test Reports: GENERATED"
+          echo " Staging Deployment: SUCCESS"
+          echo " Production Deployment: SUCCESS"
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📊 View detailed test reports in Actions artifacts"
-          echo "🔍 Check staging environment before production"
-          echo "📈 Monitor production metrics and logs"
+          echo " View detailed test reports in Actions artifacts"
+          echo " Check staging environment before production"
+          echo " Monitor production metrics and logs"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
