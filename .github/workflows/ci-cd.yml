@@ -72,12 +72,12 @@ jobs:
       - name: Install PHPUnit
         run: composer require --dev phpunit/phpunit
 
-      - name: Run Backend Unit Tests (src/tests)
+      - name: Run Backend Unit Tests (tests/)
         run: |
-          if [ -d "src/tests" ] && [ -f "src/tests/Backend_UnitTest.php" ]; then
-            vendor/bin/phpunit src/tests/Backend_UnitTest.php --verbose --coverage-html coverage-unit || true
+          if [ -d "tests" ]; then
+            vendor/bin/phpunit tests/ --verbose --coverage-html coverage-unit || true
           else
-            echo "⚠ No PHP unit tests found in src/tests/ - skipping"
+            echo "⚠ No PHP unit tests found in tests/ - skipping"
             mkdir -p coverage-unit
           fi
 
@@ -250,10 +250,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| PHP Unit Tests | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Unit Tests (tests/) | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
           echo "| Database Tests (Adil-tests) | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
           echo "| API Tests (api-tests) | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
-          echo "| UI Tests (Cypress) | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+          echo "| UI Tests (cypress/e2e) | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📊 Coverage reports available in artifacts" >> $GITHUB_STEP_SUMMARY
 
