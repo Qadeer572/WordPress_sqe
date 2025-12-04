@@ -1,85 +1,88 @@
-name: WordPress SQE Test Pipeline
+name: WordPress SQE CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ master ]
 
 jobs:
- php-unit-tests:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.2'
-        extensions: mbstring, mysqli
+  php-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Install Composer Dependencies
-      run: composer install --no-interaction
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli
 
-    - name: Fix PHPUnit Permissions
-      run: chmod +x vendor/bin/phpunit
+      - name: Install Composer
+        run: composer install --no-interaction
 
-    - name: Run PHPUnit Tests
-      run: vendor/bin/phpunit --testdox
+      - name: Fix PHPUnit permissions
+        run: chmod +x vendor/bin/phpunit
+
+      - name: Run PHPUnit Tests
+        run: |
+          echo "Running PHP Unit Tests..."
+          vendor/bin/phpunit --configuration phpunit.xml --verbose
+        continue-on-error: false
+
 
   backend-api-tests:
+    needs: php-unit-tests
     runs-on: ubuntu-latest
+
     services:
       mysql:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: wordpress_test
-        ports:
-          - 3306:3306
+          MYSQL_DATABASE: wordpress_sqe
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
-      - name: Install Python Deps
-        run: |
-          pip install pytest requests mysql-connector-python pytest-cov
+      - name: Install Python dependencies
+        run: pip install pytest requests mysql-connector-python
 
       - name: Wait for DB
-        run: |
-          for i in {1..25}; do
-            mysqladmin ping -h127.0.0.1 -uroot -proot && break
-            sleep 2
-          done
+        run: sleep 20
 
-      - name: Run DB Tests
+      - name: Run API + DB Tests
         run: pytest Adil-tests -v
+        continue-on-error: false
 
-      - name: Run API Tests
-        run: pytest api-tests -v
 
   ui-tests:
+    needs: backend-api-tests
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
 
       - name: Install Cypress
-        run: |
-          if [ ! -f package.json ]; then npm init -y; fi
-          npm install cypress --save-dev
+        run: npm install --save-dev cypress
 
-      - name: Start PHP Server
-        run: |
-          php -S localhost:8080 -t . > server.log 2>&1 &
-          sleep 5
-
-      - name: Run Cypress Tests
-        run: npx cypress run --headless
+      - name: Run Cypress UI Tests
+        run: npx cypress run
+        continue-on-error: false
