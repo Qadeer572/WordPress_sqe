@@ -7,31 +7,25 @@ on:
     branches: [ master, main ]
 
 jobs:
-  php-unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+ php-unit-tests:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.2"
-          extensions: mysqli, curl, mbstring
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+        extensions: mbstring, mysqli
 
-      - name: Ensure Composer Exists
-        run: |
-          if [ ! -f composer.json ]; then
-            echo '{"require-dev":{"phpunit/phpunit":"^10.0"}}' > composer.json
-          fi
+    - name: Install Composer Dependencies
+      run: composer install --no-interaction
 
-      - name: Install PHP Deps
-        run: composer install --no-interaction
+    - name: Fix PHPUnit Permissions
+      run: chmod +x vendor/bin/phpunit
 
-      - name: Run PHPUnit Tests
-        run: |
-          echo "Running PHPUnit tests..."
-          vendor/bin/phpunit tests --verbose
-          # REMOVE the `|| true` so failures appear!
+    - name: Run PHPUnit Tests
+      run: vendor/bin/phpunit --testdox
 
   backend-api-tests:
     runs-on: ubuntu-latest
