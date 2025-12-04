@@ -182,7 +182,7 @@ jobs:
           name: unit-test-coverage
           path: coverage-unit/
           retention-days: 7
-          if-no-files-found: ignore  # Fixed: Ignore if no files
+          if-no-files-found: ignore
 
   backend-tests:
     needs: build
@@ -241,7 +241,7 @@ jobs:
           DB_NAME: wordpress_test
         run: |
           echo "🧪 Running database tests..."
-          pytest Adil-tests -v --cov --cov-report=html:coverage-db --cov-report=term --cov-fail-under=0 || true  # Ignore if no tests
+          pytest Adil-tests -v --cov --cov-report=html:coverage-db --cov-report=term --cov-fail-under=0 || true
 
       - name: Run API Tests (api-tests)
         env:
@@ -252,7 +252,7 @@ jobs:
           DB_NAME: wordpress_test
         run: |
           echo "🧪 Running API tests..."
-          pytest api-tests -v --cov --cov-report=html:coverage-api --cov-report=term --cov-fail-under=0 || true  # Ignore if no tests
+          pytest api-tests -v --cov --cov-report=html:coverage-api --cov-report=term --cov-fail-under=0 || true
 
       - name: Upload Database Test Coverage
         uses: actions/upload-artifact@v4
@@ -261,7 +261,7 @@ jobs:
           name: db-test-coverage
           path: coverage-db/
           retention-days: 7
-          if-no-files-found: ignore  # Fixed: Ignore if no files
+          if-no-files-found: ignore
 
       - name: Upload API Test Coverage
         uses: actions/upload-artifact@v4
@@ -270,7 +270,7 @@ jobs:
           name: api-test-coverage
           path: coverage-api/
           retention-days: 7
-          if-no-files-found: ignore  # Fixed: Ignore if no files
+          if-no-files-found: ignore
 
   ui-tests:
     needs: build
@@ -329,10 +329,7 @@ jobs:
         run: |
           curl -I http://localhost:8080 || echo "⚠ Server might not be responding"
 
-      - name: Run Cypress UI Tests
-        run: |
-          echo "🧪 Running Cypress UI tests..."
-          npx cypress run --headless --browser chrome || true  # Continue if no tests
+      - run: npx cypress run --headless --browser chrome || true
 
       - name: Upload Cypress Screenshots
         uses: actions/upload-artifact@v4
@@ -341,7 +338,7 @@ jobs:
           name: cypress-screenshots
           path: cypress/screenshots/
           retention-days: 7
-          if-no-files-found: ignore  # Fixed: Ignore if no files
+          if-no-files-found: ignore
 
       - name: Upload Cypress Videos
         uses: actions/upload-artifact@v4
@@ -350,7 +347,7 @@ jobs:
           name: cypress-videos
           path: cypress/videos/
           retention-days: 7
-          if-no-files-found: ignore  # Fixed: Ignore if no files
+          if-no-files-found: ignore
 
   test-report:
     needs: [unit-tests, backend-tests, ui-tests]
