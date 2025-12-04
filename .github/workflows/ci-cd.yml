@@ -109,13 +109,26 @@ jobs:
           extensions: mysqli, curl, zip, gd, mbstring, xml
           coverage: xdebug
 
-      - name: Install PHPUnit
+      - name: Verify Composer Configuration
         run: |
-          if [ -f "composer.json" ]; then
-            composer install --no-interaction
-          else
-            composer require --dev phpunit/phpunit
+          if [ ! -f "composer.json" ]; then
+            echo "📝 Creating composer.json for PHPUnit..."
+            cat > composer.json << 'EOF'
+          {
+            "require-dev": {
+              "phpunit/phpunit": "^10.0"
+            },
+            "autoload": {
+              "files": [
+                "src/WP_Backend_Helper.php"
+              ]
+            }
+          }
+          EOF
           fi
+
+      - name: Install PHPUnit
+        run: composer install --no-interaction --prefer-dist
 
       - name: Create PHPUnit Configuration
         run: |
@@ -123,7 +136,7 @@ jobs:
             echo "📝 Creating phpunit.xml..."
             cat > phpunit.xml << 'EOF'
           <?xml version="1.0"?>
-          <phpunit bootstrap="src/WP_Backend_Helper.php" colors="true">
+          <phpunit bootstrap="vendor/autoload.php" colors="true">
               <testsuites>
                   <testsuite name="WordPress Backend Unit Tests">
                       <directory>tests</directory>
@@ -138,15 +151,25 @@ jobs:
           EOF
           fi
 
-      - name: Run PHPUnit Tests
+      - name: Verify Test Files Exist
         run: |
           if [ -d "tests" ]; then
-            echo "🧪 Running PHPUnit tests with WP_Backend_Helper..."
-            vendor/bin/phpunit --configuration phpunit.xml --verbose --coverage-html coverage-unit || true
+            echo "✅ Tests directory found"
+            ls -la tests/
           else
-            echo "⚠ No tests/ folder found - skipping unit tests"
-            mkdir -p coverage-unit
+            echo "❌ No tests/ directory found"
+            exit 1
           fi
+          if [ -f "src/WP_Backend_Helper.php" ]; then
+            echo "✅ Helper file found: src/WP_Backend_Helper.php"
+          else
+            echo "⚠ Helper file not found: src/WP_Backend_Helper.php"
+          fi
+
+      - name: Run PHPUnit Tests
+        run: |
+          echo "🧪 Running PHPUnit tests..."
+          vendor/bin/phpunit --configuration phpunit.xml --verbose --coverage-html coverage-unit || true
 
       - name: Upload Unit Test Coverage
         uses: actions/upload-artifact@v4
