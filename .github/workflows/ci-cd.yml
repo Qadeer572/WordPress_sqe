@@ -28,7 +28,7 @@ jobs:
       - name: Run PHPUnit Tests
         run: |
           echo "Running PHP Unit Tests..."
-          vendor/bin/phpunit --configuration phpunit.xml --verbose
+          vendor/bin/phpunit --configuration phpunit.xml -v
         continue-on-error: false
 
 
@@ -86,3 +86,4 @@ jobs:
       - name: Run Cypress UI Tests
         run: npx cypress run
         continue-on-error: false
+        
