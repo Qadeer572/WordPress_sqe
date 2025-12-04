@@ -1,4 +1,4 @@
-name: WordPress SQE CI/CD Pipeline
+name: WordPress SQE Test Pipeline
 
 on:
   push:
@@ -7,185 +7,33 @@ on:
     branches: [ master, main ]
 
 jobs:
-  build:
+  php-unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up PHP
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: mysqli, curl, zip, gd, mbstring, xml
-          coverage: xdebug
+          php-version: "8.2"
+          extensions: mysqli, curl, mbstring
 
-      - name: Validate WordPress Structure
+      - name: Ensure Composer Exists
         run: |
-          echo " Validating project structure..."
-          if [ -d "wp-admin" ] && [ -d "wp-content" ] && [ -d "wp-includes" ]; then
-            echo " WordPress core files detected"
-          fi
-          if [ -f "src/WP_Backend_Helper.php" ]; then
-            echo " Helper file found: src/WP_Backend_Helper.php"
-          fi
-          if [ -d "tests" ]; then
-            echo " PHPUnit tests folder found"
-            ls -la tests/ || true
-          fi
-          if [ -d "Adil-tests" ]; then
-            echo " Database tests folder found"
-            ls -la Adil-tests/ || true
-          fi
-          if [ -d "api-tests" ]; then
-            echo " API tests folder found"
-            ls -la api-tests/ || true
-          fi
-          if [ -d "cypress/e2e" ]; then
-            echo " Cypress UI tests folder found"
-            ls -la cypress/e2e/ || true
+          if [ ! -f composer.json ]; then
+            echo '{"require-dev":{"phpunit/phpunit":"^10.0"}}' > composer.json
           fi
 
-      - name: Install Composer Dependencies
-        run: |
-          if [ -f "composer.json" ]; then
-            composer install --no-interaction --prefer-dist --no-progress
-          else
-            echo " No composer.json found - creating one for PHPUnit"
-            echo '{
-              "require-dev": {
-                "phpunit/phpunit": "^10.0"
-              },
-              "autoload": {
-                "files": [
-                  "src/WP_Backend_Helper.php"
-                ]
-              }
-            }' > composer.json
-            composer install --no-interaction
-          fi
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Create package.json and Install Cypress
-        run: |
-          if [ ! -f "package.json" ]; then
-            echo " Creating package.json..."
-            npm init -y
-            npm pkg set name="wordpress-sqe-tests"
-            npm pkg set description="WordPress SQE CI/CD Testing Suite"
-          fi
-          echo " Installing Cypress..."
-          npm install --save-dev cypress
-
-      - name: Cache Dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            vendor
-            node_modules
-            ~/.cache/Cypress
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/composer.lock', '**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-
-      - name: Build Summary
-        run: |
-          echo " Build stage completed successfully"
-          echo " PHP dependencies: Ready"
-          echo " Node.js dependencies: Ready"
-          echo " Cypress: Installed"
-
-  unit-tests:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: mysqli, curl, zip, gd, mbstring, xml
-          coverage: xdebug
-
-      - name: Verify Composer Configuration
-        run: |
-          if [ ! -f "composer.json" ]; then
-            echo " Creating composer.json for PHPUnit..."
-            cat > composer.json << 'EOF'
-          {
-            "require-dev": {
-              "phpunit/phpunit": "^10.0"
-            },
-            "autoload": {
-              "files": [
-                "src/WP_Backend_Helper.php"
-              ]
-            }
-          }
-          EOF
-          fi
-
-      - name: Install PHPUnit
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Create PHPUnit Configuration
-        run: |
-          if [ ! -f "phpunit.xml" ]; then
-            echo "Creating phpunit.xml..."
-            cat > phpunit.xml << 'EOF'
-          <?xml version="1.0"?>
-          <phpunit bootstrap="vendor/autoload.php" colors="true">
-              <testsuites>
-                  <testsuite name="WordPress Backend Unit Tests">
-                      <directory>tests</directory>
-                  </testsuite>
-              </testsuites>
-              <coverage>
-                  <include>
-                      <directory suffix=".php">src</directory>
-                  </include>
-              </coverage>
-          </phpunit>
-          EOF
-          fi
-
-      - name: Verify Test Files Exist
-        run: |
-          if [ -d "tests" ]; then
-            echo " Tests directory found"
-            ls -la tests/
-          else
-            echo " No tests/ directory found"
-            exit 1
-          fi
-          if [ -f "src/WP_Backend_Helper.php" ]; then
-            echo " Helper file found: src/WP_Backend_Helper.php"
-          else
-            echo " Helper file not found: src/WP_Backend_Helper.php"
-          fi
+      - name: Install PHP Deps
+        run: composer install --no-interaction
 
       - name: Run PHPUnit Tests
         run: |
-          echo " Running PHPUnit tests..."
-          vendor/bin/phpunit --configuration phpunit.xml --verbose --coverage-html coverage-unit || true
+          echo "Running PHPUnit tests..."
+          vendor/bin/phpunit tests --verbose
+          # REMOVE the `|| true` so failures appear!
 
-      - name: Upload Unit Test Coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: unit-test-coverage
-          path: coverage-unit/
-          retention-days: 7
-          if-no-files-found: ignore
-
-  backend-tests:
-    needs: build
+  backend-api-tests:
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -195,288 +43,49 @@ jobs:
           MYSQL_DATABASE: wordpress_test
         ports:
           - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -proot"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
-      - name: Install Python Dependencies
+      - name: Install Python Deps
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-cov requests mysql-connector-python python-dotenv
+          pip install pytest requests mysql-connector-python pytest-cov
 
-      - name: Wait for MySQL to be Ready
+      - name: Wait for DB
         run: |
-          echo " Waiting for MySQL to be ready..."
-          for i in {1..30}; do
-            if mysqladmin ping -h"127.0.0.1" -P3306 -uroot -proot --silent; then
-              echo " MySQL is ready!"
-              break
-            fi
-            echo "Waiting... ($i/30)"
+          for i in {1..25}; do
+            mysqladmin ping -h127.0.0.1 -uroot -proot && break
             sleep 2
           done
 
-      - name: Verify MySQL Connection
-        run: |
-          mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SHOW DATABASES;" || true
-          mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SELECT VERSION();" || true
+      - name: Run DB Tests
+        run: pytest Adil-tests -v
 
-      - name: Run Database Tests (Adil-tests)
-        env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_USER: root
-          DB_PASSWORD: root
-          DB_NAME: wordpress_test
-        run: |
-          echo " Running database tests..."
-          pytest Adil-tests -v --cov --cov-report=html:coverage-db --cov-report=term --cov-fail-under=0 || true
-
-      - name: Run API Tests (api-tests)
-        env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_USER: root
-          DB_PASSWORD: root
-          DB_NAME: wordpress_test
-        run: |
-          echo "Running API tests..."
-          pytest api-tests -v --cov --cov-report=html:coverage-api --cov-report=term --cov-fail-under=0 || true
-
-      - name: Upload Database Test Coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: db-test-coverage
-          path: coverage-db/
-          retention-days: 7
-          if-no-files-found: ignore
-
-      - name: Upload API Test Coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: api-test-coverage
-          path: coverage-api/
-          retention-days: 7
-          if-no-files-found: ignore
+      - name: Run API Tests
+        run: pytest api-tests -v
 
   ui-tests:
-    needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up PHP (for WordPress dev server)
-        uses: shivammathur/setup-php@v2
+      - uses: actions/setup-node@v4
         with:
-          php-version: '8.2'
-          extensions: mysqli, curl, zip, gd, mbstring
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Cypress
         run: |
-          if [ ! -f "package.json" ]; then
-            npm init -y
-          fi
-          npm install --save-dev cypress
+          if [ ! -f package.json ]; then npm init -y; fi
+          npm install cypress --save-dev
 
-      - name: Create Cypress Configuration
+      - name: Start PHP Server
         run: |
-          if [ ! -f "cypress.config.js" ]; then
-            echo "Creating cypress.config.js..."
-            cat > cypress.config.js << 'EOF'
-          const { defineConfig } = require('cypress')
-          
-          module.exports = defineConfig({
-            e2e: {
-              baseUrl: 'http://localhost:8080',
-              supportFile: false,
-              specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
-              video: true,
-              screenshotOnRunFailure: true,
-              viewportWidth: 1280,
-              viewportHeight: 720
-            }
-          })
-          EOF
-          fi
-
-      - name: Start WordPress Development Server
-        run: |
-          echo "Starting PHP built-in server for WordPress..."
           php -S localhost:8080 -t . > server.log 2>&1 &
           sleep 5
-          echo " WordPress dev server running on http://localhost:8080"
 
-      - name: Verify Server is Running
-        run: |
-          curl -I http://localhost:8080 || echo " Server might not be responding"
-
-      - run: npx cypress run --headless --browser chrome || true
-
-      - name: Upload Cypress Screenshots
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cypress-screenshots
-          path: cypress/screenshots/
-          retention-days: 7
-          if-no-files-found: ignore
-
-      - name: Upload Cypress Videos
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cypress-videos
-          path: cypress/videos/
-          retention-days: 7
-          if-no-files-found: ignore
-
-  test-report:
-    needs: [unit-tests, backend-tests, ui-tests]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Download All Test Artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Generate Test Summary Report
-        run: |
-          echo "#  WordPress SQE Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Test Execution Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Test Category | Status | Location |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------------|--------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **PHPUnit Unit Tests** |  Completed | \`tests/\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Database Tests** |  Completed | \`Adil-tests/\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **API Tests** |  Completed | \`api-tests/\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Cypress UI Tests** |  Completed | \`cypress/e2e/\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "##  Coverage Reports" >> $GITHUB_STEP_SUMMARY
-          echo "- PHP Unit Coverage: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Database Test Coverage: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- API Test Coverage: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Cypress Videos/Screenshots: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo " All test suites executed successfully!" >> $GITHUB_STEP_SUMMARY
-
-  staging-deploy:
-    needs: test-report
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Deploy to Staging Environment
-        run: |
-          echo "🚀 Deploying to Staging Environment..."
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo " Creating deployment package..."
-          zip -r wordpress-staging.zip . \
-            -x "*.git*" \
-            -x "node_modules/*" \
-            -x "vendor/*/tests/*" \
-            -x "coverage-*/*" \
-            -x "cypress/videos/*" \
-            -x "cypress/screenshots/*" || true
-          echo " Staging package created: wordpress-staging.zip"
-          echo "📍 Staging URL: https://staging-wordpress-sqe.example.com"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-      - name: Run Staging Smoke Tests
-        run: |
-          echo "🔍 Running staging smoke tests..."
-          echo " Health check: PASSED"
-          echo " Database connectivity: PASSED"
-          echo " WordPress core: PASSED"
-          echo " API endpoints: PASSED"
-          echo " Staging environment verified!"
-
-  production-deploy:
-    needs: staging-deploy
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Deploy to Production Environment
-        run: |
-          echo " Deploying to Production Environment..."
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo " Creating production package..."
-          zip -r wordpress-production.zip . \
-            -x "*.git*" \
-            -x "node_modules/*" \
-            -x "vendor/*/tests/*" \
-            -x "tests/*" \
-            -x "Adil-tests/*" \
-            -x "api-tests/*" \
-            -x "cypress/*" \
-            -x "coverage-*/*" || true
-          echo " Production package created: wordpress-production.zip"
-          echo " Production URL: https://wordpress-sqe.example.com"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-      - name: Setup Production Monitoring
-        run: |
-          echo " Setting up production monitoring..."
-          echo " Error tracking: CONFIGURED"
-          echo " Performance monitoring: ENABLED"
-          echo " Uptime monitoring: ACTIVE"
-          echo " Log aggregation: READY"
-          echo " Monitoring tools configured!"
-
-      - name: Production Health Check
-        run: |
-          echo " Running production health checks..."
-          echo " Application status: HEALTHY"
-          echo " Database status: HEALTHY"
-          echo " Cache status: HEALTHY"
-          echo " CDN status: HEALTHY"
-          echo " Production deployment successful!"
-
-  notify:
-    needs: [production-deploy]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Pipeline Completion Notification
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo " CI/CD Pipeline Execution Complete"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo ""
-          echo " Build Stage: SUCCESS"
-          echo " Unit Tests (PHPUnit): SUCCESS"
-          echo " Backend Tests (Pytest): SUCCESS"
-          echo " UI Tests (Cypress): SUCCESS"
-          echo " Test Reports: GENERATED"
-          echo " Staging Deployment: SUCCESS"
-          echo " Production Deployment: SUCCESS"
-          echo ""
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo " View detailed test reports in Actions artifacts"
-          echo " Check staging environment before production"
-          echo " Monitor production metrics and logs"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - name: Run Cypress Tests
+        run: npx cypress run --headless
