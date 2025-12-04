@@ -72,16 +72,16 @@ jobs:
       - name: Install PHPUnit
         run: composer require --dev phpunit/phpunit
 
-      - name: Run PHP Unit Tests
+      - name: Run Backend Unit Tests (src/tests)
         run: |
-          if [ -d "tests/unit" ] || [ -d "tests/phpunit" ]; then
-            vendor/bin/phpunit tests/unit --verbose --coverage-html coverage-unit || true
+          if [ -d "src/tests" ] && [ -f "src/tests/Backend_UnitTest.php" ]; then
+            vendor/bin/phpunit src/tests/Backend_UnitTest.php --verbose --coverage-html coverage-unit || true
           else
-            echo "⚠ No PHP unit tests found - skipping"
+            echo "⚠ No PHP unit tests found in src/tests/ - skipping"
             mkdir -p coverage-unit
           fi
 
-      - name: Upload PHP Coverage
+      - name: Upload PHP Unit Coverage
         uses: actions/upload-artifact@v4
         if: always()
         with:
