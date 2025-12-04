@@ -4,5 +4,10 @@
     },
     "autoload-dev": {
       "psr-4": { "Tests\\": "tests/" }
+    },
+    "autoload": {
+        "files": [
+            "src/WP_Backend_Helper.php"
+        ]
     }
 }
