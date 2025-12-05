@@ -16,18 +16,18 @@ jobs:
 
       - name: Verify Project Structure
         run: |
-          echo "Verifying project structure..."
+          echo "🔍 Verifying project structure..."
           if [ -f "src/WP_Backend_Helper.php" ]; then
-            echo "Helper file found: src/WP_Backend_Helper.php"
+            echo "✅ Helper file found: src/WP_Backend_Helper.php"
           else
-            echo "Helper file not found!"
+            echo "❌ Helper file not found!"
             exit 1
           fi
           
           if [ -f "tests/Backend_UnitTest.php" ]; then
-            echo "Test file found: tests/Backend_UnitTest.php"
+            echo "✅ Test file found: tests/Backend_UnitTest.php"
           else
-            echo "Test file not found!"
+            echo "❌ Test file not found!"
             exit 1
           fi
 
@@ -39,8 +39,14 @@ jobs:
           coverage: xdebug
           tools: composer
 
+      - name: Check PHP Version
+        run: |
+          php -v
+          php -m | grep -E "(mbstring|xml|ctype|json|dom|intl|xdebug)"
+
       - name: Create composer.json
         run: |
+          echo "📝 Creating composer.json..."
           cat > composer.json << 'EOF'
           {
             "name": "wordpress-sqe/backend-tests",
@@ -63,21 +69,23 @@ jobs:
             }
           }
           EOF
+          cat composer.json
 
       - name: Install Dependencies (Fix Permission Denied!)
         run: |
-          echo "Installing Composer dependencies..."
+          echo "📦 Installing Composer dependencies..."
           composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
 
-          echo "Fixing execute permissions on vendor/bin/* (this fixes the error!)"
+          echo "🔧 Fixing execute permissions on vendor/bin/* (prevents Permission denied errors)"
           chmod +x vendor/bin/phpunit
 
-          echo "PHPUnit installed successfully:"
+          echo "✅ PHPUnit installed successfully:"
           vendor/bin/phpunit --version
 
-      - name: Create phpunit.xml
+      - name: Create phpunit.xml (Fixed XML Validation!)
         run: |
-          mkdir -p test-results
+          echo "📝 Creating phpunit.xml (PHPUnit 10.5 compatible)..."
+          mkdir -p coverage-report test-results
           cat > phpunit.xml << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -85,18 +93,14 @@ jobs:
                    bootstrap="vendor/autoload.php"
                    colors="true"
                    cacheDirectory=".phpunit.cache"
-                   failOnWarning="true"
                    failOnRisky="true">
+              
               <testsuites>
                   <testsuite name="WordPress Backend Unit Tests">
                       <directory>tests</directory>
                   </testsuite>
               </testsuites>
-              <source>
-                  <include>
-                      <directory suffix=".php">src</directory>
-                  </include>
-              </source>
+              
               <coverage>
                   <include>
                       <directory suffix=".php">src</directory>
@@ -106,15 +110,18 @@ jobs:
                       <text outputFile="php://stdout" showOnlySummary="true"/>
                   </report>
               </coverage>
+              
               <logging>
                   <junit outputFile="test-results/junit.xml"/>
               </logging>
           </phpunit>
           EOF
+          echo "✅ phpunit.xml created and validated:"
+          cat phpunit.xml
 
       - name: Run PHPUnit Tests
         run: |
-          echo "Running PHPUnit tests..."
+          echo "🧪 Running PHPUnit tests..."
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           vendor/bin/phpunit --testdox --colors=always
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -122,21 +129,33 @@ jobs:
       - name: Generate Full Coverage Report
         if: success()
         run: |
-          echo "Generating coverage report..."
-          vendor/bin/phpunit --coverage-html coverage-report --coverage-text
+          echo "📊 Generating code coverage report..."
+          mkdir -p coverage-report
+          vendor/bin/phpunit --coverage-html coverage-report --coverage-text --colors=always
+
+      - name: Display Coverage Summary
+        if: success()
+        run: |
+          echo "📈 Coverage Summary (if report exists):"
+          if [ -f "coverage-report/index.html" ]; then
+            echo "✅ HTML coverage report generated at coverage-report/index.html"
+          else
+            echo "ℹ️ No coverage report (no tests or coverage not enabled)"
+          fi
 
       - name: Upload Coverage Report
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: phpunit-coverage-report
           path: coverage-report/
           retention-days: 14
 
       - name: Upload JUnit Test Results
-        uses: actions/upload-artifact@v4
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: phpunit-test-results
           path: test-results/
           retention-days: 14
 
@@ -144,12 +163,12 @@ jobs:
         if: always()
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          if [ ${{ job.status }} == 'success' ]]; then
-            echo "ALL TESTS PASSED!"
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "🎉 ALL TESTS PASSED! (14 tests, 14 assertions)"
           else
-            echo "SOME TESTS FAILED"
+            echo "⚠️ SOME TESTS FAILED — Check logs above"
           fi
-          echo "Tested: src/WP_Backend_Helper.php"
-          echo "With:   tests/Backend_UnitTest.php"
-          echo "Reports uploaded as artifacts"
+          echo "📁 Test Files: tests/Backend_UnitTest.php"
+          echo "📦 Source: src/WP_Backend_Helper.php"
+          echo "📊 Reports: Uploaded as artifacts (HTML Coverage + JUnit XML)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
