@@ -1,3 +1,4 @@
+import os
 import pytest
 import requests
 import time
@@ -6,8 +7,22 @@ import base64
 # ------------------------
 # CONFIGURATION
 # ------------------------
-BASE_URL = "https://localhost/WordPress_sqe"  # your folder
-API_ENDPOINT = f"{BASE_URL}/wp-json/wp/v2"
+# Allow override via environment variables (for CI/CD and different local setups)
+# Default: Your local PHP server setup
+BASE_URL = os.environ.get("WP_BASE_URL", "http://127.0.0.1:8080")
+
+# API endpoint: Use env var if set, otherwise construct from BASE_URL
+# For php -S server, use index.php?rest_route= format
+# For Apache/Nginx with rewrites, use /wp-json/wp/v2 format
+if "WP_API_ENDPOINT" in os.environ:
+    API_ENDPOINT = os.environ.get("WP_API_ENDPOINT")
+elif BASE_URL.startswith("http://127.0.0.1:8080") or BASE_URL.startswith("http://localhost:8080"):
+    # PHP built-in server needs index.php?rest_route=
+    API_ENDPOINT = f"{BASE_URL}/index.php?rest_route=/wp/v2"
+else:
+    # Apache/Nginx with URL rewriting (your friend's setup)
+    API_ENDPOINT = f"{BASE_URL}/wp-json/wp/v2"
+
 TEST_USERNAME = "admin"                       # your admin username
 TEST_PASSWORD = "aZZY TYWm RoRw rDao npEV RJYM"                    # your admin password
 
