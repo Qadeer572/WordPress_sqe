@@ -1,11 +1,9 @@
-name: WordPress SQE CI - Backend Only
-
+name: Backend API and DB Tests CI
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
@@ -16,55 +14,48 @@ jobs:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: wordpress_sqe
         ports: ["3306:3306"]
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
-
+        options: --health-cmd="mysqladmin ping -h localhost" --health-interval=10s --health-timeout=5s --health-retries=5
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup PHP for WP Server
+      - name: Setup PHP for WordPress
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: mysqli, gd, curl
-
-      - name: Install WP CLI and Setup WordPress
+      - name: Install WP-CLI and Setup WordPress
         run: |
           curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-          php wp-cli.phar --info
           chmod +x wp-cli.phar
           sudo mv wp-cli.phar /usr/local/bin/wp
-          wp core download --path=wp --skip-content
+          wp core download --path=wp --skip-content --force
           wp config create --path=wp --dbname=wordpress_sqe --dbuser=root --dbpass=root --dbhost=127.0.0.1:3306 --force
-          wp core install --path=wp --url=http://localhost:8000 --title=Test --admin_user=admin --admin_password=${{ secrets.WP_ADMIN_PASS }} --admin_email=test@example.com --skip-email
-
-      - name: Start WP Server
-        run: php -S 127.0.0.1:8000 -t wp & sleep 10
-
+          wp core install --path=wp --url=http://localhost:8000 --title=TestWP --admin_user=admin --admin_password=${{ secrets.WP_ADMIN_PASS }} --admin_email=test@example.com --skip-email
+          wp rewrite structure '/%postname%/' --path=wp  # Enable permalinks for API
+      - name: Start WordPress Server
+        run: nohup php -S 127.0.0.1:8000 -t wp & sleep 20  # Give time to start
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install Python Deps
-        run: pip install pytest requests mysql-connector-python pytest-cov
-
+        run: pip install pytest requests mysql-connector-python pytest-cov base64
       - name: Run DB Tests
         env:
           DB_HOST: 127.0.0.1:3306
           DB_NAME: wordpress_sqe
           DB_USER: root
           DB_PASS: root
-        run: pytest Adil-tests -v
-
+        run: pytest Adil-tests -v --cov-report=html:coverage-db
       - name: Run API Tests
         env:
-          BASE_URL: http://127.0.0.1:8000/WordPress_sqe  # Adjust if needed
+          BASE_URL: http://127.0.0.1:8000
           TEST_USERNAME: admin
           TEST_PASSWORD: ${{ secrets.WP_ADMIN_PASS }}  # Matches WP install
-        run: pytest api-tests -v --cov-report=html:coverage-backend
-
-      - name: Upload Coverage
+        run: pytest api-tests -v --cov-report=html:coverage-api
+      - name: Upload Coverage Reports
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
-          path: coverage-backend
+          path: |
+            coverage-db
+            coverage-api
