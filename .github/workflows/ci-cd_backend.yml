@@ -137,6 +137,7 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:8000
           WP_BASE_URL: http://127.0.0.1:8000
+          WP_API_ENDPOINT: http://127.0.0.1:8000/index.php?rest_route=/wp/v2
           TEST_USERNAME: admin
           TEST_PASSWORD: admin123
         run: |

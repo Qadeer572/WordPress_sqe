@@ -16,15 +16,17 @@ BASE_URL = os.environ.get("WP_BASE_URL", "http://127.0.0.1:8080")
 # For Apache/Nginx with rewrites, use /wp-json/wp/v2 format
 if "WP_API_ENDPOINT" in os.environ:
     API_ENDPOINT = os.environ.get("WP_API_ENDPOINT")
-elif BASE_URL.startswith("http://127.0.0.1:8080") or BASE_URL.startswith("http://localhost:8080"):
+elif BASE_URL.startswith("http://127.0.0.1:8080") or BASE_URL.startswith("http://localhost:8080") or \
+     BASE_URL.startswith("http://127.0.0.1:8000") or BASE_URL.startswith("http://localhost:8000"):
     # PHP built-in server needs index.php?rest_route=
     API_ENDPOINT = f"{BASE_URL}/index.php?rest_route=/wp/v2"
 else:
     # Apache/Nginx with URL rewriting (your friend's setup)
     API_ENDPOINT = f"{BASE_URL}/wp-json/wp/v2"
 
-TEST_USERNAME = "admin"                       # your admin username
-TEST_PASSWORD = "aZZY TYWm RoRw rDao npEV RJYM"                    # your admin password
+# Allow override via environment variables (for CI/CD and different local setups)
+TEST_USERNAME = os.environ.get("TEST_USERNAME", "admin")
+TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "aZZY TYWm RoRw rDao npEV RJYM")
 
 
 # ------------------------
