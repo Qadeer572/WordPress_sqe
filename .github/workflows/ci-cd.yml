@@ -16,84 +16,65 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: wordpress_sqe
-        ports:
-          - 3306:3306
+        ports: ["3306:3306"]
         options: >-
-          --health-cmd="mysqladmin ping -h localhost"
+          --health-cmd="mysqladmin ping -h localhost -proot"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
+      - uses: actions/checkout@v4
 
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
+      - name: Setup PHP for WordPress
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.2"
-          extensions: mysqli, curl, gd
+          php-version: '8.2'
+          extensions: mysqli, gd, curl
 
-      - name: Install WP-CLI + Setup WordPress
+      - name: Install WP-CLI and Setup WordPress
         run: |
           curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
           chmod +x wp-cli.phar
           sudo mv wp-cli.phar /usr/local/bin/wp
 
-          # Download WP core
           wp core download --path=wp --skip-content --force
+          wp config create --path=wp --dbname=wordpress_sqe --dbuser=root --dbpass=root --dbhost=mysql --force
 
-          # Create wp-config
-          wp config create \
-            --path=wp \
-            --dbname=wordpress_sqe \
-            --dbuser=root \
-            --dbpass=root \
-            --dbhost=127.0.0.1 \
-            --force
-
-          # Install WP
-          wp core install \
-            --path=wp \
-            --url=http://localhost:8000 \
-            --title="TestWP" \
-            --admin_user=admin \
+          wp core install --path=wp --url=http://localhost:8000 \
+            --title=TestWP --admin_user=admin \
             --admin_password=${{ secrets.WP_ADMIN_PASS }} \
-            --admin_email=test@example.com \
-            --skip-email
+            --admin_email=test@example.com --skip-email
 
-          # Enable permalinks (needed for REST API)
-          wp rewrite structure "/%postname%/" --path=wp
+          wp rewrite structure '/%postname%/' --path=wp
 
       - name: Start WordPress Server
-        run: nohup php -S 127.0.0.1:8000 -t wp > /dev/null 2>&1 & sleep 15
+        run: nohup php -S 127.0.0.1:8000 -t wp & sleep 20
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
-      - name: Install Python Dependencies
-        run: |
-          pip install pytest requests mysql-connector-python pytest-cov
+      - name: Install Python Deps
+        run: pip install pytest requests mysql-connector-python pytest-cov
 
       - name: Run DB Tests
         env:
-          DB_HOST: 127.0.0.1
+          DB_HOST: mysql
           DB_NAME: wordpress_sqe
           DB_USER: root
           DB_PASS: root
-        run: pytest Adil-tests -v --cov=. --cov-report=html:coverage-db
+        run: pytest Adil-tests -v --cov-report=html:coverage-db
 
       - name: Run API Tests
         env:
           BASE_URL: http://127.0.0.1:8000
           TEST_USERNAME: admin
           TEST_PASSWORD: ${{ secrets.WP_ADMIN_PASS }}
-        run: pytest api-tests -v --cov=. --cov-report=html:coverage-api
+        run: pytest api-tests -v --cov-report=html:coverage-api
 
-      - name: Upload Coverage
+      - name: Upload Coverage Reports
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
