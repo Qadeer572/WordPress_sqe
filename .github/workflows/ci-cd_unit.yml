@@ -1,0 +1,169 @@
+name: WordPress Unit Tests CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Project Structure
+        run: |
+          echo "🔍 Verifying project structure..."
+          if [ -f "src/WP_Backend_Helper.php" ]; then
+            echo "✅ Helper file found: src/WP_Backend_Helper.php"
+          else
+            echo "❌ Helper file not found"
+            exit 1
+          fi
+          
+          if [ -f "tests/Backend_UnitTest.php" ]; then
+            echo "✅ Test file found: tests/Backend_UnitTest.php"
+          else
+            echo "❌ Test file not found"
+            exit 1
+          fi
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, json, dom
+          coverage: xdebug
+          tools: composer
+
+      - name: Check PHP Version
+        run: |
+          php -v
+          php -m
+
+      - name: Create Composer Configuration
+        run: |
+          echo "📝 Creating composer.json..."
+          cat > composer.json << 'EOF'
+          {
+            "name": "wordpress-sqe/backend-tests",
+            "description": "WordPress Backend Unit Tests",
+            "type": "project",
+            "require": {
+              "php": ">=8.0"
+            },
+            "require-dev": {
+              "phpunit/phpunit": "^10.5"
+            },
+            "autoload": {
+              "classmap": [
+                "src/"
+              ]
+            },
+            "autoload-dev": {
+              "classmap": [
+                "tests/"
+              ]
+            }
+          }
+          EOF
+          cat composer.json
+
+      - name: Install PHPUnit via Composer
+        run: |
+          echo "📦 Installing PHPUnit..."
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+          vendor/bin/phpunit --version
+
+      - name: Create PHPUnit Configuration
+        run: |
+          echo "📝 Creating phpunit.xml..."
+          cat > phpunit.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
+                   bootstrap="vendor/autoload.php"
+                   colors="true"
+                   cacheDirectory=".phpunit.cache"
+                   failOnWarning="true"
+                   failOnRisky="true">
+              
+              <testsuites>
+                  <testsuite name="WordPress Backend Unit Tests">
+                      <directory>tests</directory>
+                  </testsuite>
+              </testsuites>
+              
+              <source>
+                  <include>
+                      <directory suffix=".php">src</directory>
+                  </include>
+              </source>
+              
+              <coverage>
+                  <report>
+                      <html outputDirectory="coverage-report"/>
+                      <text outputFile="php://stdout" showOnlySummary="true"/>
+                  </report>
+              </coverage>
+              
+              <logging>
+                  <junit outputFile="test-results/junit.xml"/>
+              </logging>
+          </phpunit>
+          EOF
+          cat phpunit.xml
+
+      - name: Run PHPUnit Tests
+        run: |
+          echo "🧪 Running PHPUnit tests..."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          vendor/bin/phpunit --testdox --colors=always
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Generate Code Coverage Report
+        run: |
+          echo "📊 Generating code coverage report..."
+          vendor/bin/phpunit --coverage-html coverage-report --coverage-text
+
+      - name: Display Coverage Summary
+        run: |
+          echo "📈 Coverage Summary:"
+          if [ -f "coverage-report/index.html" ]; then
+            echo "✅ HTML coverage report generated"
+          fi
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpunit-coverage-report
+          path: coverage-report/
+          retention-days: 7
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phpunit-test-results
+          path: test-results/
+          retention-days: 7
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Unit Tests Completed"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📁 Test Files:"
+          echo "   - tests/Backend_UnitTest.php"
+          echo ""
+          echo "📦 Helper Classes:"
+          echo "   - src/WP_Backend_Helper.php"
+          echo ""
+          echo "📊 Reports Available:"
+          echo "   - HTML Coverage Report (artifact)"
+          echo "   - JUnit Test Results (artifact)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
