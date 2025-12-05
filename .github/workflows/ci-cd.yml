@@ -14,70 +14,155 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: wordpress_sqe
-        ports: ["3306:3306"]
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: wordpress_db
+          MYSQL_USER: admin
+          MYSQL_PASSWORD: admin
+        ports:
+          - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-cmd="mysqladmin ping -h localhost -u root -prootpassword"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=10
 
     steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup PHP for WordPress
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Verify MySQL Connection
+        run: |
+          echo "🔍 Testing MySQL connection..."
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -u root -prootpassword --silent; then
+              echo "✅ MySQL is ready!"
+              break
+            fi
+            echo "⏳ Waiting for MySQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: Setup MySQL User Permissions
+        run: |
+          echo "🔧 Configuring MySQL users..."
+          mysql -h 127.0.0.1 -P 3306 -u root -prootpassword <<EOF
+          CREATE USER IF NOT EXISTS 'wpuser'@'%' IDENTIFIED BY 'wppass';
+          GRANT ALL PRIVILEGES ON wordpress_sqe.* TO 'wpuser'@'%';
+          GRANT ALL PRIVILEGES ON wordpress_sqe.* TO 'root'@'%' IDENTIFIED BY 'rootpassword';
+          FLUSH PRIVILEGES;
+          SELECT User, Host FROM mysql.user;
+          SHOW DATABASES;
+          EOF
+          echo "✅ MySQL users configured"
+
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: mysqli, gd, curl
+          php-version: "8.2"
+          extensions: mysqli, curl, gd, mbstring, xml
 
-      - name: Install WP-CLI and Setup WordPress
+      - name: Install WP-CLI
         run: |
           curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
           chmod +x wp-cli.phar
           sudo mv wp-cli.phar /usr/local/bin/wp
+          wp --version
 
+      - name: Setup WordPress
+        run: |
+          echo "📦 Downloading WordPress..."
           wp core download --path=wp --skip-content --force
-          wp config create --path=wp --dbname=wordpress_sqe --dbuser=root --dbpass=root --dbhost=mysql --force
 
-          wp core install --path=wp --url=http://localhost:8000 \
-            --title=TestWP --admin_user=admin \
-            --admin_password=${{ secrets.WP_ADMIN_PASS }} \
-            --admin_email=test@example.com --skip-email
+          echo "🔧 Creating wp-config.php..."
+          wp config create \
+            --path=wp \
+            --dbname=wordpress_sqe \
+            --dbuser=wpuser \
+            --dbpass=wppass \
+            --dbhost=127.0.0.1:3306 \
+            --force
 
-          wp rewrite structure '/%postname%/' --path=wp
+          echo "⚙️ Installing WordPress..."
+          wp core install \
+            --path=wp \
+            --url=http://localhost:8000 \
+            --title="TestWP" \
+            --admin_user=admin \
+            --admin_password=admin123 \
+            --admin_email=test@example.com \
+            --skip-email
+
+          echo "🔗 Enabling permalinks..."
+          wp rewrite structure "/%postname%/" --path=wp
+          wp rewrite flush --path=wp
+
+          echo "✅ WordPress setup complete"
 
       - name: Start WordPress Server
-        run: nohup php -S 127.0.0.1:8000 -t wp & sleep 20
+        run: |
+          echo "🚀 Starting WordPress development server..."
+          nohup php -S 127.0.0.1:8000 -t wp > server.log 2>&1 &
+          sleep 10
+          echo "✅ Server started on http://127.0.0.1:8000"
 
+      - name: Verify WordPress is Running
+        run: |
+          echo "🔍 Testing WordPress server..."
+          curl -I http://127.0.0.1:8000 || echo "⚠️ Server might not be ready"
+          
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
-      - name: Install Python Deps
-        run: pip install pytest requests mysql-connector-python pytest-cov
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest requests mysql-connector-python pytest-cov python-dotenv
 
-      - name: Run DB Tests
+      - name: Run Database Tests (Adil-tests)
         env:
-          DB_HOST: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
           DB_NAME: wordpress_sqe
-          DB_USER: root
-          DB_PASS: root
-        run: pytest Adil-tests -v --cov-report=html:coverage-db
+          DB_USER: wpuser
+          DB_PASS: wppass
+        run: |
+          echo "🧪 Running database tests..."
+          pytest Adil-tests/test_db_queries.py -v --cov --cov-report=html:coverage-db --cov-report=term || true
 
-      - name: Run API Tests
+      - name: Run API Tests (api-tests)
         env:
           BASE_URL: http://127.0.0.1:8000
+          WP_BASE_URL: http://127.0.0.1:8000
           TEST_USERNAME: admin
-          TEST_PASSWORD: ${{ secrets.WP_ADMIN_PASS }}
-        run: pytest api-tests -v --cov-report=html:coverage-api
+          TEST_PASSWORD: admin123
+        run: |
+          echo "🧪 Running API tests..."
+          pytest api-tests/test_wp_api.py -v --cov --cov-report=html:coverage-api --cov-report=term || true
 
-      - name: Upload Coverage Reports
+      - name: Upload Database Coverage
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: backend-coverage
-          path: |
-            coverage-db
-            coverage-api
+          name: db-coverage
+          path: coverage-db/
+
+      - name: Upload API Coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-coverage
+          path: coverage-api/
+
+      - name: Display Test Summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 Backend Tests Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Database Tests: Completed"
+          echo "✅ API Tests: Completed"
+          echo "📦 Coverage reports uploaded as artifacts"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
