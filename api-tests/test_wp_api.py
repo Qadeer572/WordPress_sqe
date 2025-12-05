@@ -3,6 +3,7 @@ import pytest
 import requests
 import time
 import base64
+from urllib.parse import urlencode
 
 # ------------------------
 # CONFIGURATION
@@ -16,15 +17,17 @@ BASE_URL = os.environ.get("WP_BASE_URL", "http://127.0.0.1:8080")
 # For Apache/Nginx with rewrites, use /wp-json/wp/v2 format
 if "WP_API_ENDPOINT" in os.environ:
     API_ENDPOINT = os.environ.get("WP_API_ENDPOINT")
-elif BASE_URL.startswith("http://127.0.0.1:8080") or BASE_URL.startswith("http://localhost:8080"):
+elif BASE_URL.startswith("http://127.0.0.1:8080") or BASE_URL.startswith("http://localhost:8080") or \
+     BASE_URL.startswith("http://127.0.0.1:8000") or BASE_URL.startswith("http://localhost:8000"):
     # PHP built-in server needs index.php?rest_route=
     API_ENDPOINT = f"{BASE_URL}/index.php?rest_route=/wp/v2"
 else:
     # Apache/Nginx with URL rewriting (your friend's setup)
     API_ENDPOINT = f"{BASE_URL}/wp-json/wp/v2"
 
-TEST_USERNAME = "admin"                       # your admin username
-TEST_PASSWORD = "aZZY TYWm RoRw rDao npEV RJYM"                    # your admin password
+# Allow override via environment variables (for CI/CD and different local setups)
+TEST_USERNAME = os.environ.get("TEST_USERNAME", "admin")
+TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "aZZY TYWm RoRw rDao npEV RJYM")
 
 
 # ------------------------
@@ -67,7 +70,7 @@ class TestWordPressPostsAPI:
         # Cleanup created posts
         for post_id in self.created_post_ids:
             try:
-                self.session.delete(f"{API_ENDPOINT}/posts/{post_id}?force=true")
+                self.session.delete(f"{API_ENDPOINT}/posts/{post_id}", params={"force": "true"})
             except:
                 pass
 
@@ -123,10 +126,22 @@ class TestWordPressPostsAPI:
     def test_delete_post(self):
         post_data = {"title": "Delete", "content": "Delete me", "status": "draft"}
         create_resp = self.session.post(f"{API_ENDPOINT}/posts", json=post_data)
-        if create_resp.status_code == 201:
-            post_id = create_resp.json()["id"]
-            response = self.session.delete(f"{API_ENDPOINT}/posts/{post_id}?force=true")
-            assert response.status_code == 200
+        if create_resp.status_code != 201:
+            pytest.skip("Could not create post")
+        post_id = create_resp.json()["id"]
+        # Verify post exists before deleting
+        get_resp = self.session.get(f"{API_ENDPOINT}/posts/{post_id}")
+        assert get_resp.status_code == 200, f"Post {post_id} should exist before deletion"
+        # Delete the post - use proper URL encoding for query parameters
+        delete_url = f"{API_ENDPOINT}/posts/{post_id}"
+        response = self.session.delete(delete_url, params={"force": "true"})
+        print(f"\nDELETE /posts/{post_id} - Status: {response.status_code}")
+        if response.status_code != 200:
+            print(f"Response: {response.text}")
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}. Response: {response.text}"
+        # Verify it was deleted
+        verify_resp = self.session.get(f"{API_ENDPOINT}/posts/{post_id}")
+        assert verify_resp.status_code == 404, "Post should be deleted (404)"
 
     def test_publish_post(self):
         post_data = {"title": "Draft to Publish", "content": "Publishing this", "status": "draft"}

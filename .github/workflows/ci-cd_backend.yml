@@ -98,6 +98,11 @@ jobs:
           wp rewrite structure "/%postname%/" --path=wp
           wp rewrite flush --path=wp
 
+          echo "🔐 Enabling Basic Auth for REST API..."
+          mkdir -p wp/wp-content/mu-plugins
+          cp .github/plugins/enable-basic-auth.php wp/wp-content/mu-plugins/
+          echo "✅ Basic Auth enabled for REST API"
+
           echo "✅ WordPress setup complete"
 
       - name: Start WordPress Server
@@ -137,6 +142,7 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:8000
           WP_BASE_URL: http://127.0.0.1:8000
+          WP_API_ENDPOINT: http://127.0.0.1:8000/index.php?rest_route=/wp/v2
           TEST_USERNAME: admin
           TEST_PASSWORD: admin123
         run: |
