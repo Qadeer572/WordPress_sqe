@@ -78,8 +78,8 @@ def test_insert_mock_post(db_connection):
     
     # Insert a temporary post
     cursor.execute("""
-        INSERT INTO wp_posts (post_author, post_date, post_content, post_title, post_status)
-        VALUES (1, NOW(), 'Test content', 'Test Title', 'publish');
+        INSERT INTO wp_posts (post_author, post_date, post_content, post_title, post_status, post_excerpt)
+        VALUES (1, NOW(), 'Test content', 'Test Title', 'publish', '');
     """)
     db_connection.commit()
 
