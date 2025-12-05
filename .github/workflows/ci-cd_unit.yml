@@ -9,25 +9,25 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Verify Project Structure
         run: |
-          echo "🔍 Verifying project structure..."
+          echo "Verifying project structure..."
           if [ -f "src/WP_Backend_Helper.php" ]; then
-            echo "✅ Helper file found: src/WP_Backend_Helper.php"
+            echo "Helper file found: src/WP_Backend_Helper.php"
           else
-            echo "❌ Helper file not found"
+            echo "Helper file not found!"
             exit 1
           fi
           
           if [ -f "tests/Backend_UnitTest.php" ]; then
-            echo "✅ Test file found: tests/Backend_UnitTest.php"
+            echo "Test file found: tests/Backend_UnitTest.php"
           else
-            echo "❌ Test file not found"
+            echo "Test file not found!"
             exit 1
           fi
 
@@ -35,18 +35,12 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mbstring, xml, ctype, json, dom
+          extensions: mbstring, xml, ctype, json, dom, intl
           coverage: xdebug
           tools: composer
 
-      - name: Check PHP Version
+      - name: Create composer.json
         run: |
-          php -v
-          php -m
-
-      - name: Create Composer Configuration
-        run: |
-          echo "📝 Creating composer.json..."
           cat > composer.json << 'EOF'
           {
             "name": "wordpress-sqe/backend-tests",
@@ -59,28 +53,31 @@ jobs:
               "phpunit/phpunit": "^10.5"
             },
             "autoload": {
-              "classmap": [
-                "src/"
-              ]
+              "classmap": ["src/"]
             },
             "autoload-dev": {
-              "classmap": [
-                "tests/"
-              ]
+              "classmap": ["tests/"]
+            },
+            "scripts": {
+              "test": "phpunit"
             }
           }
           EOF
-          cat composer.json
 
-      - name: Install PHPUnit via Composer
+      - name: Install Dependencies (Fix Permission Denied!)
         run: |
-          echo "📦 Installing PHPUnit..."
-          composer install --no-interaction --prefer-dist --optimize-autoloader
+          echo "Installing Composer dependencies..."
+          composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
+
+          echo "Fixing execute permissions on vendor/bin/* (this fixes the error!)"
+          chmod +x vendor/bin/phpunit
+
+          echo "PHPUnit installed successfully:"
           vendor/bin/phpunit --version
 
-      - name: Create PHPUnit Configuration
+      - name: Create phpunit.xml
         run: |
-          echo "📝 Creating phpunit.xml..."
+          mkdir -p test-results
           cat > phpunit.xml << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -90,80 +87,69 @@ jobs:
                    cacheDirectory=".phpunit.cache"
                    failOnWarning="true"
                    failOnRisky="true">
-              
               <testsuites>
                   <testsuite name="WordPress Backend Unit Tests">
                       <directory>tests</directory>
                   </testsuite>
               </testsuites>
-              
               <source>
                   <include>
                       <directory suffix=".php">src</directory>
                   </include>
               </source>
-              
               <coverage>
+                  <include>
+                      <directory suffix=".php">src</directory>
+                  </include>
                   <report>
                       <html outputDirectory="coverage-report"/>
                       <text outputFile="php://stdout" showOnlySummary="true"/>
                   </report>
               </coverage>
-              
               <logging>
                   <junit outputFile="test-results/junit.xml"/>
               </logging>
           </phpunit>
           EOF
-          cat phpunit.xml
 
       - name: Run PHPUnit Tests
         run: |
-          echo "🧪 Running PHPUnit tests..."
+          echo "Running PHPUnit tests..."
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           vendor/bin/phpunit --testdox --colors=always
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-      - name: Generate Code Coverage Report
+      - name: Generate Full Coverage Report
+        if: success()
         run: |
-          echo "📊 Generating code coverage report..."
+          echo "Generating coverage report..."
           vendor/bin/phpunit --coverage-html coverage-report --coverage-text
-
-      - name: Display Coverage Summary
-        run: |
-          echo "📈 Coverage Summary:"
-          if [ -f "coverage-report/index.html" ]; then
-            echo "✅ HTML coverage report generated"
-          fi
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
         with:
-          name: phpunit-coverage-report
+          name: coverage-report
           path: coverage-report/
-          retention-days: 7
+          retention-days: 14
 
-      - name: Upload Test Results
+      - name: Upload JUnit Test Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: phpunit-test-results
+          name: test-results
           path: test-results/
-          retention-days: 7
+          retention-days: 14
 
       - name: Test Summary
         if: always()
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ Unit Tests Completed"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📁 Test Files:"
-          echo "   - tests/Backend_UnitTest.php"
-          echo ""
-          echo "📦 Helper Classes:"
-          echo "   - src/WP_Backend_Helper.php"
-          echo ""
-          echo "📊 Reports Available:"
-          echo "   - HTML Coverage Report (artifact)"
-          echo "   - JUnit Test Results (artifact)"
+          if [ ${{ job.status }} == 'success' ]]; then
+            echo "ALL TESTS PASSED!"
+          else
+            echo "SOME TESTS FAILED"
+          fi
+          echo "Tested: src/WP_Backend_Helper.php"
+          echo "With:   tests/Backend_UnitTest.php"
+          echo "Reports uploaded as artifacts"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
