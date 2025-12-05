@@ -15,9 +15,9 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: rootpassword
-          MYSQL_DATABASE: wordpress_db
-          MYSQL_USER: admin
-          MYSQL_PASSWORD: admin
+          MYSQL_DATABASE: wordpress_sqe
+          MYSQL_USER: wpuser
+          MYSQL_PASSWORD: wppass
         ports:
           - 3306:3306
         options: >-
@@ -49,9 +49,10 @@ jobs:
           mysql -h 127.0.0.1 -P 3306 -u root -prootpassword <<EOF
           CREATE USER IF NOT EXISTS 'wpuser'@'%' IDENTIFIED BY 'wppass';
           GRANT ALL PRIVILEGES ON wordpress_sqe.* TO 'wpuser'@'%';
-          GRANT ALL PRIVILEGES ON wordpress_sqe.* TO 'root'@'%' IDENTIFIED BY 'rootpassword';
+          GRANT ALL PRIVILEGES ON wordpress_sqe.* TO 'root'@'%';
+          GRANT ALL PRIVILEGES ON wordpress_sqe.* TO 'root'@'localhost';
           FLUSH PRIVILEGES;
-          SELECT User, Host FROM mysql.user;
+          SELECT User, Host FROM mysql.user WHERE User IN ('root', 'wpuser');
           SHOW DATABASES;
           EOF
           echo "✅ MySQL users configured"
