@@ -1,87 +1,3 @@
-# name: Cypress E2E Tests
-# on:
-#   push:
-#     branches: [ master, main ]
-#   pull_request:
-#     branches: [ master, main ]
-
-# jobs:
-#   cypress-tests:
-#     runs-on: ubuntu-latest
-    
-#     services:
-#       mysql:
-#         image: mysql:5.7
-#         env:
-#           MYSQL_ROOT_PASSWORD: root
-#           MYSQL_DATABASE: wordpress
-#         ports:
-#           - 3306:3306
-#         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
-
-#     steps:
-#       - name: Checkout Repository
-#         uses: actions/checkout@v4
-
-#       - name: Setup PHP
-#         uses: shivammathur/setup-php@v2
-#         with:
-#           php-version: '8.1'
-#           extensions: mysqli, pdo_mysql, gd, intl, zip
-#           tools: wp-cli
-      
-#       - name: Configure WordPress
-#         run: |
-#           # Create wp-config.php from sample
-#           if [ -f wp-config-sample.php ]; then
-#             cp wp-config-sample.php wp-config.php
-#           else 
-#             echo "::error::wp-config-sample.php not found. Cannot configure WordPress."
-#             exit 1
-#           fi
-
-#           # Update database details using sed for simplicity in CI env implies standard wp-config
-#           # Alternatively use wp-cli config create if wp-config-sample is not reliable, but let's try sample first or wp-cli edit
-          
-#           # Using wp-cli to set config is safer and cleaner
-#           rm wp-config.php # remove the copy we just made to use wp config create instead
-          
-#           wp config create --dbname=wordpress --dbuser=root --dbpass=root --dbhost=127.0.0.1 --skip-check --extra-php <<PHP
-#           define( 'WP_DEBUG', true );
-#           define( 'WP_DEBUG_LOG', true );
-#           PHP
-
-#       - name: Install WordPress
-#         run: |
-#           wp core install --url=http://127.0.0.1:8000 --title="WordPress Test" --admin_user=admin --admin_password=password --admin_email=admin@example.com --skip-email
-
-#       - name: Run PHP Server
-#         run: |
-#           php -S 127.0.0.1:8000 > php_server.log 2>&1 &
-#           echo "Server started with PID $!"
-#           sleep 3 # Give it a moment to start
-
-#       - name: Wait for WordPress to be ready
-#         run: |
-#           for i in {1..30}; do
-#             if curl -s http://127.0.0.1:8000 > /dev/null; then
-#               echo "WordPress is up!"
-#               break
-#             fi
-#             echo "Waiting for WordPress..."
-#             sleep 1
-#           done
-
-#       - name: Run Cypress Tests
-#         uses: cypress-io/github-action@v6
-#         with:
-#           browser: chrome
-#           wait-on: 'http://127.0.0.1:8000'
-#         env:
-#           CYPRESS_baseUrl: http://127.0.0.1:8000
-
-
-
 name: Cypress E2E Tests
 
 on:
@@ -111,14 +27,20 @@ jobs:
           --health-timeout=5s
           --health-retries=3
 
+    strategy:
+      matrix:
+        php-version: ['8.0', '8.1']
+        node-version: ['18', '20']
+      fail-fast: false
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP ${{ matrix.php-version }}
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: ${{ matrix.php-version }}
           extensions: mysqli, pdo_mysql, mbstring, xml, ctype, json, tokenizer, dom, zip, gd
           tools: wp-cli
           coverage: none
@@ -128,18 +50,29 @@ jobs:
           echo "🔍 PHP Version:"
           php -v
           echo ""
+          echo "📦 Installed Extensions:"
+          php -m
+          echo ""
           echo "🛠️  WP-CLI Version:"
           wp --version
 
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      - name: Wait for MySQL
+      - name: Verify Node Installation
         run: |
-          echo "⏳ Waiting for MySQL..."
+          echo "🔍 Node Version:"
+          node -v
+          echo ""
+          echo "📦 NPM Version:"
+          npm -v
+
+      - name: Wait for MySQL to be Ready
+        run: |
+          echo "⏳ Waiting for MySQL service..."
           for i in {1..30}; do
             if mysqladmin ping -h"127.0.0.1" -P"3306" -u"root" -p"root" --silent; then
               echo "✅ MySQL is ready!"
@@ -149,11 +82,14 @@ jobs:
             sleep 2
           done
 
-      - name: Configure WordPress
+      - name: Configure WordPress Database
         run: |
           echo "🔧 Configuring WordPress..."
           
+          # Check if wp-config-sample.php exists
           if [ ! -f "wp-config-sample.php" ]; then
+            echo "❌ wp-config-sample.php not found!"
+            echo "Creating default wp-config.php..."
             cat > wp-config.php << 'EOF'
           <?php
           define( 'DB_NAME', 'wordpress' );
@@ -163,14 +99,14 @@ jobs:
           define( 'DB_CHARSET', 'utf8mb4' );
           define( 'DB_COLLATE', '' );
           
-          define('AUTH_KEY',         'test-auth-key-'.bin2hex(random_bytes(32)));
-          define('SECURE_AUTH_KEY',  'test-secure-auth-key-'.bin2hex(random_bytes(32)));
-          define('LOGGED_IN_KEY',    'test-logged-in-key-'.bin2hex(random_bytes(32)));
-          define('NONCE_KEY',        'test-nonce-key-'.bin2hex(random_bytes(32)));
-          define('AUTH_SALT',        'test-auth-salt-'.bin2hex(random_bytes(32)));
-          define('SECURE_AUTH_SALT', 'test-secure-auth-salt-'.bin2hex(random_bytes(32)));
-          define('LOGGED_IN_SALT',   'test-logged-in-salt-'.bin2hex(random_bytes(32)));
-          define('NONCE_SALT',       'test-nonce-salt-'.bin2hex(random_bytes(32)));
+          define('AUTH_KEY',         'test-auth-key');
+          define('SECURE_AUTH_KEY',  'test-secure-auth-key');
+          define('LOGGED_IN_KEY',    'test-logged-in-key');
+          define('NONCE_KEY',        'test-nonce-key');
+          define('AUTH_SALT',        'test-auth-salt');
+          define('SECURE_AUTH_SALT', 'test-secure-auth-salt');
+          define('LOGGED_IN_SALT',   'test-logged-in-salt');
+          define('NONCE_SALT',       'test-nonce-salt');
           
           $table_prefix = 'wp_';
           define( 'WP_DEBUG', false );
@@ -182,7 +118,10 @@ jobs:
           require_once ABSPATH . 'wp-settings.php';
           EOF
           else
+            echo "✅ Using wp-config-sample.php as template"
             cp wp-config-sample.php wp-config.php
+            
+            # Update database credentials
             sed -i "s/database_name_here/wordpress/g" wp-config.php
             sed -i "s/username_here/root/g" wp-config.php
             sed -i "s/password_here/root/g" wp-config.php
@@ -195,7 +134,7 @@ jobs:
         run: |
           echo "🚀 Installing WordPress..."
           wp core install \
-            --url="http://127.0.0.1:8000" \
+            --url="http://127.0.0.1:8080" \
             --title="WordPress CI Test Site" \
             --admin_user="admin" \
             --admin_password="admin123" \
@@ -203,62 +142,72 @@ jobs:
             --skip-email \
             --allow-root
           
-          echo "✅ WordPress installed"
+          echo "✅ WordPress installed successfully"
+          
+          # Display WordPress info
+          echo ""
+          echo "📊 WordPress Information:"
+          wp core version --allow-root
+          wp db check --allow-root
 
-      - name: Setup WordPress
+      - name: Setup WordPress Test Data (Optional)
         run: |
-          echo "📝 Setting up WordPress..."
+          echo "📝 Setting up test data..."
           
-          wp rewrite structure '/%postname%/' --allow-root
-          wp rewrite flush --allow-root
-          
-          chmod -R 755 wp-content
-          mkdir -p wp-content/uploads
-          chmod -R 777 wp-content/uploads
-          
+          # Create test pages
           wp post create \
             --post_type=page \
             --post_title='Test Page' \
-            --post_content='Test page content' \
+            --post_content='This is a test page for Cypress testing.' \
             --post_status=publish \
             --allow-root
           
+          # Create test post
           wp post create \
             --post_type=post \
             --post_title='Test Post' \
-            --post_content='Test post content' \
+            --post_content='This is a test post for Cypress testing.' \
             --post_status=publish \
             --allow-root
           
-          echo "✅ WordPress configured"
+          echo "✅ Test data created"
 
-      - name: Start PHP Server
+      - name: Start PHP Built-in Server
         run: |
-          echo "🌐 Starting PHP server..."
-          nohup php -S 127.0.0.1:8000 > server.log 2>&1 &
+          echo "🌐 Starting PHP development server..."
+          nohup php -S 127.0.0.1:8080 > server.log 2>&1 &
           echo $! > server.pid
           
+          # Wait for server to start
+          echo "⏳ Waiting for server to be ready..."
           for i in {1..30}; do
-            if curl -s http://127.0.0.1:8000 > /dev/null; then
+            if curl -s http://127.0.0.1:8080 > /dev/null; then
               echo "✅ Server is ready!"
               break
             fi
             echo "Waiting... ($i/30)"
             sleep 2
           done
-
-      - name: Install Dependencies
-        run: |
-          echo "📦 Installing dependencies..."
           
+          # Verify server is running
+          curl -I http://127.0.0.1:8080
+
+      - name: Install Cypress Dependencies
+        run: |
+          echo "📦 Installing Cypress and dependencies..."
+          
+          # Check if package.json exists
           if [ ! -f "package.json" ]; then
+            echo "Creating package.json..."
             cat > package.json << 'EOF'
           {
             "name": "wordpress-cypress-tests",
             "version": "1.0.0",
+            "description": "Cypress E2E tests for WordPress",
             "scripts": {
               "cy:run": "cypress run",
-              "cy:open": "cypress open"
+              "cy:open": "cypress open",
+              "cy:verify": "cypress verify"
             },
             "devDependencies": {
               "cypress": "^13.6.0"
@@ -269,116 +218,199 @@ jobs:
           
           npm install
 
-      - name: Create Cypress Config
+      - name: Verify Cypress Installation
         run: |
-          echo "⚙️  Creating Cypress config..."
+          echo "🔍 Verifying Cypress..."
+          npx cypress verify
+          npx cypress info
+
+      - name: Create Cypress Configuration
+        run: |
+          echo "⚙️  Creating Cypress configuration..."
           
-          if [ ! -f "cypress.config.js" ]; then
+          # Update cypress.config.js baseUrl if it exists, or create it
+          if [ -f "cypress.config.js" ]; then
+            # Update baseUrl to use port 8080 for CI
+            sed -i "s|baseUrl:.*|baseUrl: 'http://127.0.0.1:8080',|" cypress.config.js || true
+            echo "✅ Updated cypress.config.js baseUrl"
+          else
             cat > cypress.config.js << 'EOF'
           const { defineConfig } = require('cypress')
 
           module.exports = defineConfig({
             e2e: {
-              baseUrl: 'http://127.0.0.1:8000',
+              baseUrl: 'http://127.0.0.1:8080',
               viewportWidth: 1280,
               viewportHeight: 720,
               video: true,
               screenshotOnRunFailure: true,
-              videoCompression: 32,
-              defaultCommandTimeout: 10000,
-              requestTimeout: 10000,
-              responseTimeout: 10000,
-              pageLoadTimeout: 30000,
-              retries: {
-                runMode: 2,
-                openMode: 0
-              },
               setupNodeEvents(on, config) {
-                return config
+                // implement node event listeners here
               },
             },
             env: {
               wpUser: 'admin',
               wpPassword: 'admin123',
-              wpUrl: 'http://127.0.0.1:8000',
             },
           })
           EOF
+            echo "✅ Created cypress.config.js"
           fi
 
-      - name: Setup Cypress Support Files
+      - name: Create Sample Cypress Tests
         run: |
-          echo "📝 Setting up Cypress..."
+          echo "📝 Creating sample Cypress tests..."
           
-          mkdir -p cypress/e2e cypress/support cypress/fixtures
+          # Create cypress directory structure
+          mkdir -p cypress/e2e
+          mkdir -p cypress/support
+          mkdir -p cypress/fixtures
           
-          cat > cypress/support/e2e.js << 'EOF'
-          import './commands'
+          # Create sample test if no tests exist
+          if [ ! -f "cypress/e2e/wordpress.cy.js" ]; then
+            cat > cypress/e2e/wordpress.cy.js << 'EOF'
+          describe('WordPress Basic Tests', () => {
+            beforeEach(() => {
+              cy.visit('/')
+            })
 
-          Cypress.on('uncaught:exception', (err, runnable) => {
-            console.log('Uncaught exception:', err.message)
-            return false
-          })
-          EOF
-          
-          cat > cypress/support/commands.js << 'EOF'
-          Cypress.Commands.add('wpLogin', (username = 'admin', password = 'admin123') => {
-            cy.session([username, password], () => {
+            it('should load the homepage', () => {
+              cy.title().should('contain', 'WordPress CI Test Site')
+            })
+
+            it('should access the admin login page', () => {
+              cy.visit('/wp-admin')
+              cy.get('#loginform').should('be.visible')
+              cy.get('#user_login').should('be.visible')
+              cy.get('#user_pass').should('be.visible')
+            })
+
+            it('should login to WordPress admin', () => {
               cy.visit('/wp-login.php')
-              cy.get('#user_login', { timeout: 10000 }).should('be.visible').clear().type(username)
-              cy.get('#user_pass').should('be.visible').clear().type(password)
+              cy.get('#user_login').type(Cypress.env('wpUser'))
+              cy.get('#user_pass').type(Cypress.env('wpPassword'))
               cy.get('#wp-submit').click()
-              cy.url({ timeout: 15000 }).should('include', '/wp-admin')
+              cy.url().should('include', '/wp-admin')
+              cy.get('#wpadminbar').should('be.visible')
+            })
+
+            it('should navigate to posts page', () => {
+              // Login first
+              cy.visit('/wp-login.php')
+              cy.get('#user_login').type(Cypress.env('wpUser'))
+              cy.get('#user_pass').type(Cypress.env('wpPassword'))
+              cy.get('#wp-submit').click()
+              
+              // Navigate to posts
+              cy.visit('/wp-admin/edit.php')
+              cy.contains('Posts').should('be.visible')
             })
           })
+          EOF
+            echo "✅ Created sample test: cypress/e2e/wordpress.cy.js"
+          fi
+          
+          # Create support file
+          if [ ! -f "cypress/support/e2e.js" ]; then
+            cat > cypress/support/e2e.js << 'EOF'
+          // Import commands.js
+          import './commands'
 
-          Cypress.Commands.add('wpAdminLogin', () => {
-            cy.wpLogin()
-            cy.visit('/wp-admin')
-            cy.get('#wpadminbar', { timeout: 10000 }).should('be.visible')
-          })
-
-          Cypress.Commands.add('wpWaitForAdmin', () => {
-            cy.get('#wpadminbar', { timeout: 15000 }).should('be.visible')
-            cy.get('#wpbody-content', { timeout: 10000 }).should('be.visible')
+          // Hide fetch/XHR requests from command log
+          Cypress.on('window:before:load', (win) => {
+            cy.stub(win.console, 'error').as('consoleError')
+            cy.stub(win.console, 'warn').as('consoleWarn')
           })
           EOF
+          fi
           
-          echo "✅ Cypress configured"
+          # Create commands file
+          if [ ! -f "cypress/support/commands.js" ]; then
+            cat > cypress/support/commands.js << 'EOF'
+          // Custom WordPress login command
+          Cypress.Commands.add('wpLogin', (username, password) => {
+            cy.visit('/wp-login.php')
+            cy.get('#user_login').type(username)
+            cy.get('#user_pass').type(password)
+            cy.get('#wp-submit').click()
+            cy.url().should('include', '/wp-admin')
+          })
+
+          // Custom WordPress logout command
+          Cypress.Commands.add('wpLogout', () => {
+            cy.visit('/wp-login.php?action=logout')
+            cy.get('a').contains('log out').click()
+          })
+          EOF
+          fi
 
       - name: Run Cypress Tests
         uses: cypress-io/github-action@v6
         with:
           browser: chrome
           headed: false
+          config: baseUrl=http://127.0.0.1:8080
         env:
-          CYPRESS_baseUrl: http://127.0.0.1:8000
+          CYPRESS_baseUrl: http://127.0.0.1:8080
+          CYPRESS_wpUser: admin
+          CYPRESS_wpPassword: admin123
 
-      - name: Upload Screenshots
+      - name: Display Server Logs (on failure)
+        if: failure()
+        run: |
+          echo "🔍 PHP Server Logs:"
+          cat server.log || echo "No server logs found"
+
+      - name: Upload Cypress Screenshots
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: cypress-screenshots
+          name: cypress-screenshots-php${{ matrix.php-version }}-node${{ matrix.node-version }}
           path: cypress/screenshots
           retention-days: 7
+          if-no-files-found: ignore
 
-      - name: Upload Videos
+      - name: Upload Cypress Videos
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cypress-videos
+          name: cypress-videos-php${{ matrix.php-version }}-node${{ matrix.node-version }}
           path: cypress/videos
           retention-days: 7
+          if-no-files-found: ignore
 
-      - name: Display Logs on Failure
-        if: failure()
-        run: |
-          echo "🔍 Server Logs:"
-          cat server.log || echo "No logs"
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cypress-results-php${{ matrix.php-version }}-node${{ matrix.node-version }}
+          path: |
+            cypress/results
+            cypress/reports
+          retention-days: 7
+          if-no-files-found: ignore
 
-      - name: Cleanup
+      - name: Stop PHP Server
         if: always()
         run: |
           if [ -f server.pid ]; then
             kill $(cat server.pid) || true
+            rm server.pid
           fi
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Cypress E2E Tests Completed"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔧 Configuration:"
+          echo "   PHP Version: ${{ matrix.php-version }}"
+          echo "   Node Version: ${{ matrix.node-version }}"
+          echo "   Base URL: http://127.0.0.1:8080"
+          echo ""
+          echo "📊 Artifacts:"
+          echo "   - Cypress Screenshots (on failure)"
+          echo "   - Cypress Videos"
+          echo "   - Test Results"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
