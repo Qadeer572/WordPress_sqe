@@ -16,11 +16,7 @@ describe('Plugin Management Flows', () => {
   const adminPassword = 'raza@1214'
 
   const loginAsAdmin = () => {
-    cy.visit(loginUrl)
-    cy.get('#user_login').clear().type(adminUsername)
-    cy.get('#user_pass').clear().type(adminPassword)
-    cy.get('#wp-submit').click()
-    cy.url().should('include', '/wp-admin')
+    cy.wpLogin(adminUsername, adminPassword)
   }
 
   const goToAddNewPlugins = () => {

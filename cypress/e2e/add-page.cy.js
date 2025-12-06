@@ -49,12 +49,8 @@ describe('WordPress Page Editor Functionality Tests', () => {
 // Helper: visit the page editor as an admin user
 // -------------------------------------------------------------------
   const visitPageEditor = () => {
-    cy.visit(loginUrl);
-    cy.get('#user_login').clear().type(username);
-    cy.get('#user_pass').clear().type(password);
-    cy.get('#wp-submit').click();
-
-    cy.url().should('include', '/wp-admin');
+    // Login using the custom command
+    cy.wpLogin(username, password);
 
     cy.visit(pageUrl);
 

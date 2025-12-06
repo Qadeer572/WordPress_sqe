@@ -20,11 +20,7 @@ describe('UI Navigation Flows', () => {
    * Helper: login as admin
    */
   const loginAsAdmin = () => {
-    cy.visit(loginUrl)
-    cy.get('#user_login').clear().type(adminUsername)
-    cy.get('#user_pass').clear().type(adminPassword)
-    cy.get('#wp-submit').click()
-    cy.url().should('include', '/wp-admin')
+    cy.wpLogin(adminUsername, adminPassword)
   }
 
   /**

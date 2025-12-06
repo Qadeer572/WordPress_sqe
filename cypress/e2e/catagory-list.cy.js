@@ -16,13 +16,8 @@ describe('Categories List Page - Hover Actions Testing', () => {
   
     beforeEach(() => {
       // Login as admin before each test
-      cy.visit(loginUrl)
-      cy.get('#user_login').clear().type(adminUsername)
-      cy.get('#user_pass').clear().type(adminPassword)
-      cy.get('#wp-submit').click()
-  
-      // Wait for admin dashboard to load
-      cy.url().should('include', '/wp-admin')
+    // Login as admin before each test using the custom command
+    cy.wpLogin(adminUsername, adminPassword)
   
       // Navigate to Categories page
       cy.visit(categoriesUrl)
