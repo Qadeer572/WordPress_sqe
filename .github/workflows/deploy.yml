@@ -1,121 +1,89 @@
-name: Deploy WordPress to EC2 (AWS)
+name: Deploy WordPress to EC2
 
 on:
   push:
     branches:
-      - master      
-  pull_request:
-    branches:
-      - master
+      - master        # Change to 'main' if your default branch is main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
     steps:
-      # 1. Checkout repository code
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Verify secrets are set (debugging step)
-      - name: Verify Configuration
+      # Optional: Remove this step after you're 100% sure secrets work
+      - name: Verify Secrets (Debug)
         run: |
-          echo "Checking if secrets are configured..."
-          if [ -z "${{ secrets.EC2_HOST }}" ]; then
-            echo "❌ EC2_HOST secret is not set!"
-            exit 1
-          fi
-          if [ -z "${{ secrets.EC2_USER }}" ]; then
-            echo "❌ EC2_USER secret is not set!"
-            exit 1
-          fi
-          if [ -z "${{ secrets.EC2_KEY }}" ]; then
-            echo "❌ EC2_SSH_KEY secret is not set!"
-            exit 1
-          fi
-          echo "✅ All secrets are configured"
           echo "Host: ${{ secrets.EC2_HOST }}"
           echo "User: ${{ secrets.EC2_USER }}"
+          echo "SSH Key: ${{(secrets.EC2_KEY != '') && 'FOUND' || 'MISSING'}}"
 
-      # 3. Deploy to EC2 via SSH .
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
+          key: ${{ secrets.EC2_KEY }}           # This matches your secret name
           port: 22
-          command_timeout: 10m
+          timeout: 60s
+          command_timeout: 15m
           script: |
-            set -e  # Exit on any error
-            
-            echo "============================================"
-            echo "Starting deployment process..."
-            echo "============================================"
-            
-            # Navigate to web root
+            set -e
+
+            echo "Starting WordPress deployment..."
             cd /var/www/html
-            
-            # Check if git repository exists
+
+            # Pull latest or clone fresh
             if [ -d ".git" ]; then
-              echo "📦 Git repository found - pulling latest changes..."
+              echo "Updating existing WordPress site..."
               sudo -u www-data git fetch --all
               sudo -u www-data git reset --hard origin/master
               sudo -u www-data git clean -fd
             else
-              echo "📥 No repository found - cloning fresh copy..."
+              echo "First-time deploy — cloning repository..."
               sudo rm -rf /var/www/html/*
               sudo -u www-data git clone https://github.com/Qadeer572/WordPress_sqe.git /var/www/html
             fi
-            
-            echo "🔧 Fixing file permissions..."
-            # Set ownership to web server user
+
+            # Critical: Create wp-config.php if missing
+            if [ ! -f wp-config.php ]; then
+              echo "wp-config.php not found → creating from sample..."
+              sudo -u www-data cp wp-config-sample.php wp-config.php || echo "wp-config-sample.php missing!"
+            fi
+
+            # Fix permissions (the WordPress standard)
             sudo chown -R www-data:www-data /var/www/html
-            
-            # Set directory permissions
             sudo find /var/www/html -type d -exec chmod 755 {} \;
-            
-            # Set file permissions
             sudo find /var/www/html -type f -exec chmod 644 {} \;
-            
-            # WordPress-specific permissions
-            echo "🔒 Setting WordPress-specific permissions..."
-            sudo chmod -R 755 /var/www/html/wp-content/uploads 2>/dev/null || true
-            sudo chmod 600 /var/www/html/wp-config.php 2>/dev/null || true
-            
-            # Restart Apache
-            echo "🔄 Restarting Apache web server..."
-            sudo systemctl restart apache2
-            
-            # Verify Apache is running
+            sudo chmod -R 775 /var/www/html/wp-content/uploads 2>/dev/null || true
+
+            # Remove problematic .htaccess that breaks Apache
+            [ -f .htaccess ] && sudo rm -f .htaccess && echo "Removed broken .htaccess"
+
+            # Enable rewrite module (needed for permalinks)
+            sudo a2enmod rewrite || true
+
+            # Test Apache config before restart
+            echo "Testing Apache configuration..."
+            sudo apache2ctl configtest || echo "Config test failed, but continuing..."
+
+            # Restart Apache safely
+            echo "Restarting Apache..."
+            sudo systemctl restart apache2 || {
+              echo "Apache restart failed — checking logs..."
+              journalctl -u apache2 --since "2 minutes ago" | tail -20
+              exit 1
+            }
+
+            # Final confirmation
             if sudo systemctl is-active --quiet apache2; then
-              echo "✅ Apache is running successfully"
+              echo "DEPLOYMENT SUCCESSFUL! WordPress is LIVE!"
+              echo "Visit: http://${{ secrets.EC2_HOST }}"
             else
-              echo "❌ Apache failed to start"
-              sudo systemctl status apache2
+              echo "Apache failed to start"
+              sudo systemctl status apache2 --no-pager
               exit 1
             fi
-            
-            echo "============================================"
-            echo "✅ Deployment completed successfully!"
-            echo "============================================"
-
-      # 4. Notify on success
-      - name: Deployment Success
-        if: success()
-        run: |
-          echo "🎉 Deployment to EC2 completed successfully!"
-          echo "Visit: http://${{ secrets.EC2_HOST }}"
-
-      # 5. Notify on failure
-      - name: Deployment Failed
-        if: failure()
-        run: |
-          echo "❌ Deployment failed. Please check the logs above."
-          echo "Common issues:"
-          echo "  - SSH key format incorrect"
-          echo "  - Security group blocking port 22"
-          echo "  - Incorrect EC2_HOST or EC2_USER"
-          echo "  - EC2 instance not running"
