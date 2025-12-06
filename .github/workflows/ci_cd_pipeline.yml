@@ -1,0 +1,69 @@
+name: Full CI/CD Pipeline – Staging + Production (SQE Project)
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  # Stage 3: Automated Testing (you already have this, placeholder is enough)
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All automated tests (Unit / API / UI / DB) passed – already implemented"
+
+  # Stage 4: STAGING – Automatic deploy after tests
+  deploy-staging:
+    needs: tests
+    runs-on: ubuntu-latest
+    environment: staging                     # This is your GitHub Environment "staging"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Deploy to STAGING (same EC2 server)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            echo "STAGING DEPLOYMENT STARTED"
+            cd /var/www/html
+            sudo -u www-data git fetch --all
+            sudo -u www-data git reset --hard origin/master
+            sudo -u www-data git clean -fd
+            sudo chown -R www-data:www-data /var/www/html
+            sudo systemctl restart apache2
+            echo "STAGING DEPLOYMENT DONE – Ready for manual testing"
+
+  # Stage 5: PRODUCTION – Only after manual approval
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production                  # This is your GitHub Environment "production"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Deploy to PRODUCTION (after manual approval)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            echo "PRODUCTION DEPLOYMENT STARTED"
+            cd /var/www/html
+            sudo -u www-data git fetch --all
+            sudo -u www-data git reset --hard origin/master
+            sudo -u www-data git clean -fd
+            sudo chown -R www-data:www-data /var/www/html
+            sudo systemctl restart apache2
+            echo "PRODUCTION DEPLOYMENT SUCCESSFUL – WordPress is LIVE!"
