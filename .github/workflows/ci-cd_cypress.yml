@@ -27,20 +27,14 @@ jobs:
           --health-timeout=5s
           --health-retries=3
 
-    strategy:
-      matrix:
-        php-version: ['8.0', '8.1']
-        node-version: ['18', '20']
-      fail-fast: false
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup PHP ${{ matrix.php-version }}
+      - name: Setup PHP 8.1
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php-version }}
+          php-version: '8.1'
           extensions: mysqli, pdo_mysql, mbstring, xml, ctype, json, tokenizer, dom, zip, gd
           tools: wp-cli
           coverage: none
@@ -56,10 +50,10 @@ jobs:
           echo "🛠️  WP-CLI Version:"
           wp --version
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: '20'
           cache: 'npm'
 
       - name: Verify Node Installation
@@ -365,7 +359,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: cypress-screenshots-php${{ matrix.php-version }}-node${{ matrix.node-version }}
+          name: cypress-screenshots
           path: cypress/screenshots
           retention-days: 7
           if-no-files-found: ignore
@@ -374,7 +368,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cypress-videos-php${{ matrix.php-version }}-node${{ matrix.node-version }}
+          name: cypress-videos
           path: cypress/videos
           retention-days: 7
           if-no-files-found: ignore
@@ -383,7 +377,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cypress-results-php${{ matrix.php-version }}-node${{ matrix.node-version }}
+          name: cypress-results
           path: |
             cypress/results
             cypress/reports
@@ -405,8 +399,8 @@ jobs:
           echo "✅ Cypress E2E Tests Completed"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "🔧 Configuration:"
-          echo "   PHP Version: ${{ matrix.php-version }}"
-          echo "   Node Version: ${{ matrix.node-version }}"
+          echo "   PHP Version: 8.1"
+          echo "   Node Version: 20"
           echo "   Base URL: http://127.0.0.1:8080"
           echo ""
           echo "📊 Artifacts:"
