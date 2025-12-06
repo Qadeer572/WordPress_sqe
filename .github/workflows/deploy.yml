@@ -3,7 +3,7 @@ name: Deploy WordPress to EC2 (AWS)
 on:
   push:
     branches:
-      - master      # Change to 'main' if your default branch is main
+      - master      
   pull_request:
     branches:
       - master
@@ -31,7 +31,7 @@ jobs:
             echo "❌ EC2_USER secret is not set!"
             exit 1
           fi
-          if [ -z "${{ secrets.EC2_SSH_KEY }}" ]; then
+          if [ -z "${{ secrets.EC2_KEY }}" ]; then
             echo "❌ EC2_SSH_KEY secret is not set!"
             exit 1
           fi
