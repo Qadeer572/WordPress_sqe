@@ -14,7 +14,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Optional: Remove this step after you're 100% sure secrets work
+      # Optional: Remove this step after you're 100% sure secrets work.
       - name: Verify Secrets (Debug)
         run: |
           echo "Host: ${{ secrets.EC2_HOST }}"
