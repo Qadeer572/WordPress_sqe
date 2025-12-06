@@ -346,8 +346,8 @@ jobs:
           config: baseUrl=http://127.0.0.1:8080
         env:
           CYPRESS_baseUrl: http://127.0.0.1:8080
-          CYPRESS_wpUser: admin
-          CYPRESS_wpPassword: admin123
+          CYPRESS_wpUser: Qadeer572
+          CYPRESS_wpPassword: raza@1214
 
       - name: Display Server Logs (on failure)
         if: failure()
