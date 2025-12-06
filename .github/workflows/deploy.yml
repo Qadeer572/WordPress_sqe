@@ -1,54 +1,63 @@
-name: CI-CD
+name: Deploy WordPress to EC2
 
 on:
   push:
     branches:
-      - master   # or your branch name
+      - master      # change to 'main' if your default branch is main
   pull_request:
     branches:
       - master
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      # Add your PHP/Python/Cypress test steps here
-
   deploy:
-    needs: test
     runs-on: ubuntu-latest
     steps:
+      # 1. Checkout your repository code
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          port: 22
-          script: |
-            set -e   # exit on error
+          fetch-depth: 0   # important for git reset --hard later
 
-            # go to WordPress root
+      # 2. Deploy to EC2 via SSH (Fixed & Working 2025 Version)
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}          # e.g., 16.171.249.240 or ec2-x-x-x-x.compute-1.amazonaws.com
+          username: ${{ secrets.EC2_USER }}      # usually: ubuntu, ec2-user, or admin
+          key: ${{ secrets.EC2_SSH_KEY }}        # FULL private key (including -----BEGIN...-----)
+          port: 22
+          timeout: 60s
+          script: |
+            set -e  # Stop on any error
+
+            echo "Deploying to /var/www/html..."
+
             cd /var/www/html
 
-            # if .git exists, pull latest changes; else clone the fork
+            # If .git exists → pull latest changes
             if [ -d ".git" ]; then
-                sudo -u www-data git fetch --all
-                sudo -u www-data git reset --hard origin/main
+              echo "Repository exists → pulling latest changes..."
+              sudo -u www-data git fetch --all
+              sudo -u www-data git reset --hard origin/master   # or origin/main
+              sudo -u www-data git clean -fd
             else
-                sudo rm -rf /var/www/html/*
-                sudo -u www-data git clone https://github.com/Qadeer572/WordPress_sqe.git /var/www/html
+              echo "No repository found → cloning fresh..."
+              sudo rm -rf /var/www/html/*
+              sudo -u www-data git clone https://github.com/Qadeer572/WordPress_sqe.git /var/www/html
             fi
 
-            # fix permissions
+            # Fix ownership & permissions (critical for WordPress)
+            echo "Fixing permissions..."
             sudo chown -R www-data:www-data /var/www/html
             sudo find /var/www/html -type d -exec chmod 755 {} \;
             sudo find /var/www/html -type f -exec chmod 644 {} \;
 
-            # restart Apache to apply changes
+            # Special WordPress permissions
+            sudo chmod -R 755 /var/www/html/wp-content/uploads 2>/dev/null || true
+            sudo chmod 600 /var/www/html/wp-config.php 2>/dev/null || true
+
+            # Restart web server
+            echo "Restarting Apache..."
             sudo systemctl restart apache2
+
+            echo "Deployment completed successfully!"
