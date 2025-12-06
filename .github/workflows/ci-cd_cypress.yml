@@ -105,6 +105,11 @@ jobs:
           $table_prefix = 'wp_';
           define( 'WP_DEBUG', false );
           
+          // Configure cookies for development/testing environment
+          define( 'COOKIE_DOMAIN', false );
+          define( 'COOKIEPATH', '/' );
+          define( 'SITECOOKIEPATH', '/' );
+          
           if ( ! defined( 'ABSPATH' ) ) {
             define( 'ABSPATH', __DIR__ . '/' );
           }
@@ -120,6 +125,15 @@ jobs:
             sed -i "s/username_here/root/g" wp-config.php
             sed -i "s/password_here/root/g" wp-config.php
             sed -i "s/localhost/127.0.0.1:3306/g" wp-config.php
+            
+            # Add cookie configuration for development/testing
+            if ! grep -q "COOKIE_DOMAIN" wp-config.php; then
+              echo "" >> wp-config.php
+              echo "// Configure cookies for development/testing environment" >> wp-config.php
+              echo "define( 'COOKIE_DOMAIN', false );" >> wp-config.php
+              echo "define( 'COOKIEPATH', '/' );" >> wp-config.php
+              echo "define( 'SITECOOKIEPATH', '/' );" >> wp-config.php
+            fi
           fi
           
           echo "✅ wp-config.php configured"
@@ -143,6 +157,35 @@ jobs:
           echo "📊 WordPress Information:"
           wp core version --allow-root
           wp db check --allow-root
+          
+          # Verify user exists and can authenticate
+          echo ""
+          echo "🔍 Verifying admin user..."
+          wp user list --allow-root --format=table
+          
+          # Check if user exists, create if not
+          if ! wp user get Qadeer572 --allow-root --format=table 2>/dev/null; then
+            echo "⚠️  User Qadeer572 not found, creating..."
+            wp user create Qadeer572 admin@example.com --user_pass=raza@1214 --role=administrator --allow-root
+          fi
+          
+          # Verify user exists now
+          echo ""
+          echo "🔍 User details:"
+          wp user get Qadeer572 --allow-root --format=table
+          
+          # Test password authentication
+          echo ""
+          echo "🔍 Testing password authentication..."
+          wp user check-password Qadeer572 raza@1214 --allow-root && echo "✅ Password is correct" || echo "❌ Password verification failed"
+          
+          # Configure WordPress for proper cookie handling (important for PHP built-in server)
+          echo ""
+          echo "🔧 Configuring WordPress for development/testing..."
+          wp option update siteurl "http://127.0.0.1:8080" --allow-root
+          wp option update home "http://127.0.0.1:8080" --allow-root
+          
+          echo "✅ WordPress configuration complete"
 
       - name: Setup WordPress Test Data (Optional)
         run: |
@@ -185,6 +228,16 @@ jobs:
           
           # Verify server is running
           curl -I http://127.0.0.1:8080
+          
+          # Test login page is accessible
+          echo ""
+          echo "🔍 Testing login page accessibility..."
+          curl -s http://127.0.0.1:8080/wp-login.php | grep -q "user_login" && echo "✅ Login page is accessible" || echo "❌ Login page not accessible"
+          
+          # Test admin page redirects to login (confirms WordPress is working)
+          echo ""
+          echo "🔍 Testing admin page (should redirect to login)..."
+          curl -sL http://127.0.0.1:8080/wp-admin | grep -q "wp-login" && echo "✅ Admin redirects to login (expected)" || echo "⚠️  Admin page behavior unexpected"
 
       - name: Install Cypress Dependencies
         run: |
