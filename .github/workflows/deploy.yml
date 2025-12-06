@@ -1,4 +1,4 @@
-name: Deploy WordPress to EC2
+name: Deploy WordPress to EC2(AWS)
 
 on:
   push:
