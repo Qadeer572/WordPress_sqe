@@ -39,7 +39,7 @@ jobs:
           echo "Host: ${{ secrets.EC2_HOST }}"
           echo "User: ${{ secrets.EC2_USER }}"
 
-      # 3. Deploy to EC2 via SSH
+      # 3. Deploy to EC2 via SSH .
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
