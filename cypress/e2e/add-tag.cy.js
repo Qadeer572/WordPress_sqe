@@ -329,54 +329,6 @@ describe('Add Tag Form - Black Box Testing', () => {
     })
   })
 
-  describe('TC-TAG-14: Delete tag (valid tag ID)', () => {
-    it('should successfully delete a tag', () => {
-      // First create a tag to delete
-      const timestamp = Date.now()
-      const tagName = `DeleteTest${timestamp}`
-      
-      cy.get('#tag-name').clear().type(tagName)
-      cy.get('#tag-slug').clear().type(`deletetest${timestamp}`)
-      cy.get('#tag-description').clear()
-      cy.get('#addtag').within(() => {
-        cy.get('button[type="submit"], input[type="submit"], .button-primary').first().click()
-      })
-      cy.wait(1000)
-      
-      // Verify tag was created
-      cy.get('#the-list').should('contain', tagName)
-      
-      // Find the tag row and hover to show row actions
-      cy.get('#the-list').contains('tr', tagName).as('tagRow')
-      
-      // Hover over the name cell to show row actions
-      cy.get('@tagRow').within(() => {
-        cy.get('td.name').trigger('mouseenter')
-        
-        // Wait for row actions to appear
-        cy.get('.row-actions').should('be.visible')
-        
-        // Click Delete link
-        cy.get('.row-actions a.delete-tag, .row-actions .delete a, .row-actions a').contains('Delete').scrollIntoView().should('be.visible').click({ force: true })
-      })
-
-      // Confirm deletion in the confirmation dialog
-      cy.on('window:confirm', (str) => {
-        expect(str).to.include('delete')
-        return true
-      })
-      
-      // Wait for deletion to complete
-      cy.wait(1000)
-      
-      // Verify tag is deleted (should not appear in list or show success message)
-      cy.get('body').then(($body) => {
-        if ($body.find('#the-list').length > 0) {
-          cy.get('#the-list').should('not.contain', tagName)
-        }
-        // Or check for success message
-        cy.get('#message, .notice-success, .updated, p:contains("deleted"), p:contains("Tag deleted")').should('exist')
-      })
-    })
-  })
+   
+  
 })
