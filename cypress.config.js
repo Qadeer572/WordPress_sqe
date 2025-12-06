@@ -2,7 +2,8 @@ const { defineConfig } = require('cypress')
 
 module.exports = defineConfig({
   e2e: {
-    baseUrl: 'http://localhost/WordPress_sqe',
+    // Use environment variable if set, otherwise fallback to local development
+    baseUrl: process.env.CYPRESS_baseUrl || process.env.BASE_URL || 'http://127.0.0.1:8080',
     setupNodeEvents(on, config) {
       // implement node event listeners here
     },

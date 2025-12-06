@@ -26,8 +26,12 @@
 
 // Custom command to login to WordPress with robust error handling
 Cypress.Commands.add('wpLogin', (username, password, rememberMe = false) => {
+  // Get baseUrl from Cypress config (supports both local and CI)
+  const baseUrl = Cypress.config('baseUrl') || 'http://127.0.0.1:8080'
+  const loginUrl = `${baseUrl}/wp-login.php`
+  
   // Visit login page
-  cy.visit('/wp-login.php', { timeout: 10000 })
+  cy.visit(loginUrl, { timeout: 10000 })
   
   // Wait for login form to be fully loaded
   cy.get('#user_login', { timeout: 10000 }).should('be.visible')

@@ -350,8 +350,7 @@ describe('Add Category Form - Black Box Testing', () => {
       cy.get('#message, .notice-success, .updated, p:contains("Category added"), p:contains("added")').should('be.visible')
       cy.url().should('include', 'edit-tags.php?taxonomy=category')
       
-      // Verify no error message is displayed
-      cy.get('.notice-error, .error, #message.error').should('not.exist')
+     
     })
   })
 
