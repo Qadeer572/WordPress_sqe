@@ -8,9 +8,9 @@ class PerformanceTest extends TestCase
 
     private $baseUrl;
     
-    public function __construct()
+    protected function setUp(): void
     {
-        parent::__construct();
+        parent::setUp();
         // Use environment variable if set (for CI), otherwise default to localhost
         $this->baseUrl = getenv('WP_BASE_URL') ?: 'http://127.0.0.1:8080';
     }
