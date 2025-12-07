@@ -43,11 +43,18 @@ Cypress.Commands.add('wpLogin', (username, password, rememberMe = false) => {
   cy.get('#user_login').clear().type(username, { delay: 0 })
   cy.get('#user_pass').clear().type(password, { delay: 0 })
   
-  if (rememberMe) {
-    cy.get('#rememberme').check()
-  } else {
-    cy.get('#rememberme').uncheck()
-  }
+  // Handle remember me checkbox only if it exists
+  cy.get('body').then(($body) => {
+    if ($body.find('#rememberme').length > 0) {
+      if (rememberMe) {
+        cy.get('#rememberme').check()
+      } else {
+        cy.get('#rememberme').uncheck()
+      }
+    } else {
+      cy.log('Remember me checkbox not found - skipping')
+    }
+  })
   
   // Submit login form
   cy.get('#wp-submit').click()

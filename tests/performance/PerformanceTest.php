@@ -33,7 +33,7 @@ class PerformanceTest extends TestCase
             $this->baseUrl . '/wp-admin/options-permalink.php',
             $this->baseUrl . '/wp-admin/options-privacy.php',
             $this->baseUrl . '/wp-admin/options-security.php'
-        ];
+    ];
     }
 
     public function testPageResponseTimes()
@@ -52,11 +52,11 @@ class PerformanceTest extends TestCase
             
             // Only assert if page was accessible
             if ($content !== false) {
-                $this->assertLessThan(
-                    $this->maxResponseTime,
-                    $duration,
-                    "Page $page took too long: $duration seconds"
-                );
+            $this->assertLessThan(
+                $this->maxResponseTime,
+                $duration,
+                "Page $page took too long: $duration seconds"
+            );
             } else {
                 $this->markTestSkipped("Page $page is not accessible (WordPress may not be running)");
             }

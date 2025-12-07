@@ -1,0 +1,8 @@
+body {
+  background-color: var(--wp--preset--color--base-2);
+}
+
+/* Skip Link. */
+.wp-block-html:first-child {
+  display: none;
+}
