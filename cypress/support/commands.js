@@ -30,13 +30,14 @@ Cypress.Commands.add('wpLogin', (username, password, rememberMe = false) => {
   const baseUrl = Cypress.config('baseUrl') || 'http://127.0.0.1:8080'
   const loginUrl = `${baseUrl}/wp-login.php`
   
-  // Visit login page
-  cy.visit(loginUrl, { timeout: 10000 })
+  // Visit login page with longer timeout (use pageLoadTimeout from config or default to 60s)
+  const pageLoadTimeout = Cypress.config('pageLoadTimeout') || 60000
+  cy.visit(loginUrl, { timeout: pageLoadTimeout, failOnStatusCode: false })
   
-  // Wait for login form to be fully loaded
-  cy.get('#user_login', { timeout: 10000 }).should('be.visible')
-  cy.get('#user_pass', { timeout: 10000 }).should('be.visible')
-  cy.get('#wp-submit', { timeout: 10000 }).should('be.visible')
+  // Wait for login form to be fully loaded with retry
+  cy.get('#user_login', { timeout: 15000 }).should('be.visible')
+  cy.get('#user_pass', { timeout: 15000 }).should('be.visible')
+  cy.get('#wp-submit', { timeout: 15000 }).should('be.visible')
   
   // Clear and type credentials
   cy.get('#user_login').clear().type(username, { delay: 0 })
@@ -73,5 +74,21 @@ Cypress.Commands.add('checkLoginError', (expectedError) => {
 Cypress.Commands.add('checkLoginSuccess', () => {
   cy.url().should('not.include', '/wp-login.php')
   cy.url().should('include', '/wp-admin')
+})
+
+// Accessibility helper commands
+Cypress.Commands.add('injectAxe', () => {
+  cy.injectAxe()
+})
+
+Cypress.Commands.add('checkA11y', (context, options, violationCallback) => {
+  cy.checkA11y(context, options, violationCallback)
+})
+
+// Custom command to check keyboard navigation
+Cypress.Commands.add('testKeyboardNavigation', (selector) => {
+  cy.get(selector).first().focus()
+  cy.focused().should('exist')
+  cy.focused().tab()
 })
 

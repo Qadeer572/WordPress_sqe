@@ -7,7 +7,13 @@
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
     "test:login": "cypress run --spec 'cypress/e2e/login.cy.js'",
-    "test:add-user": "cypress run --spec 'cypress/e2e/add-user.cy.js'"
+    "test:add-user": "cypress run --spec 'cypress/e2e/add-user.cy.js'",
+    "test:a11y": "cypress run --spec 'cypress/e2e/accessibility-frontend.cy.js' --spec 'cypress/e2e/accessibility-admin.cy.js'",
+    "test:a11y:frontend": "cypress run --spec 'cypress/e2e/accessibility-frontend.cy.js'",
+    "test:a11y:admin": "cypress run --spec 'cypress/e2e/accessibility-admin.cy.js'",
+    "test:security": "cypress run --spec 'cypress/e2e/security-frontend.cy.js' --spec 'cypress/e2e/security-admin.cy.js'",
+    "test:security:frontend": "cypress run --spec 'cypress/e2e/security-frontend.cy.js'",
+    "test:security:admin": "cypress run --spec 'cypress/e2e/security-admin.cy.js'"
   },
   "keywords": [
     "cypress",
@@ -17,7 +23,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "cypress": "^13.6.0"
+    "axe-core": "^4.11.0",
+    "cypress": "^13.6.0",
+    "cypress-axe": "^1.7.0"
   }
 }
-

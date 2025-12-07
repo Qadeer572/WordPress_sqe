@@ -243,7 +243,7 @@ jobs:
         run: |
           echo "📦 Installing Cypress and dependencies..."
           
-          # Check if package.json exists
+          # Check if package.json exists, if not create a basic one
           if [ ! -f "package.json" ]; then
             echo "Creating package.json..."
             cat > package.json << 'EOF'
@@ -252,17 +252,22 @@ jobs:
             "version": "1.0.0",
             "description": "Cypress E2E tests for WordPress",
             "scripts": {
-              "cy:run": "cypress run",
-              "cy:open": "cypress open",
-              "cy:verify": "cypress verify"
+              "cypress:open": "cypress open",
+              "cypress:run": "cypress run",
+              "test:login": "cypress run --spec 'cypress/e2e/login.cy.js'",
+              "test:a11y": "cypress run --spec 'cypress/e2e/accessibility-frontend.cy.js' --spec 'cypress/e2e/accessibility-admin.cy.js'",
+              "test:security": "cypress run --spec 'cypress/e2e/security-frontend.cy.js' --spec 'cypress/e2e/security-admin.cy.js'"
             },
             "devDependencies": {
-              "cypress": "^13.6.0"
+              "cypress": "^13.6.0",
+              "cypress-axe": "^1.7.0",
+              "axe-core": "^4.11.0"
             }
           }
           EOF
           fi
           
+          # Install all dependencies including accessibility and security test dependencies
           npm install
 
       - name: Verify Cypress Installation
@@ -392,7 +397,13 @@ jobs:
           EOF
           fi
 
-      - name: Run Cypress Tests
+      - name: Install Cypress Dependencies (Full)
+        run: |
+          echo "📦 Installing all Cypress dependencies..."
+          npm install cypress-axe axe-core --save-dev || true
+          npm install
+
+      - name: Run All Cypress Tests
         uses: cypress-io/github-action@v6
         with:
           browser: chrome
@@ -456,6 +467,18 @@ jobs:
           echo "   PHP Version: 8.1"
           echo "   Node Version: 20"
           echo "   Base URL: http://127.0.0.1:8080"
+          echo ""
+          echo "📋 Test Suites Included:"
+          echo "   - Login Tests (login.cy.js)"
+          echo "   - Accessibility Tests (accessibility-frontend.cy.js, accessibility-admin.cy.js)"
+          echo "   - Security Tests (security-frontend.cy.js, security-admin.cy.js)"
+          echo "   - UI Tests (frontend-ui.cy.js, editor-ui.cy.js, dashboard-widgets.cy.js)"
+          echo "   - Navigation Tests (navigation.cy.js)"
+          echo "   - Media Library Tests (media-library.cy.js, add-media.cy.js)"
+          echo "   - User Management Tests (add-user.cy.js, user-list.cy.js, user-profile.cy.js)"
+          echo "   - Content Management Tests (add-category.cy.js, add-tag.cy.js, etc.)"
+          echo "   - Settings Tests (general-settings.cy.js, reading-settings.cy.js, etc.)"
+          echo "   - And all other E2E test files"
           echo ""
           echo "📊 Artifacts:"
           echo "   - Cypress Screenshots (on failure)"

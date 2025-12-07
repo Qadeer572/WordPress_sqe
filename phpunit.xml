@@ -5,6 +5,10 @@
     <testsuites>
         <testsuite name="Backend">
             <directory>tests</directory>
+            <exclude>tests/performance</exclude>
+        </testsuite>
+        <testsuite name="Performance">
+            <directory>tests/performance</directory>
         </testsuite>
     </testsuites>
 
